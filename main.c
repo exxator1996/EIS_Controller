@@ -58,9 +58,9 @@ int main(void) {
     CY_ASSERT(0);
   }
 
-  uint32_t periodValue = 16000U-1;
+  uint32_t periodValue = 16000U - 1;
   uint16_t msbValue = (uint16_t)(periodValue >> 16);
-  uint16_t lsbValue = (uint16_t)(periodValue / (msbValue+1));
+  uint16_t lsbValue = (uint16_t)(periodValue / (msbValue + 1));
 
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
