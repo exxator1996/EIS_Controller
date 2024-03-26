@@ -46,7 +46,7 @@
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
-  PORT0->OMR |= (PORT0_OMR_PS0_Msk | PORT0_OMR_PR0_Msk);
+  PORT0->OMR |= (PORT0_OMR_PS5_Msk | PORT0_OMR_PR5_Msk);
 }
 
 int main(void) {
@@ -58,7 +58,7 @@ int main(void) {
     CY_ASSERT(0);
   }
 
-  uint32_t periodValue = 16000U - 1;
+  uint32_t periodValue = 160000000U - 1;
   uint16_t msbValue = (uint16_t)(periodValue >> 16);
   uint16_t lsbValue = (uint16_t)(periodValue / (msbValue + 1));
 
