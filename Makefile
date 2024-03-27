@@ -42,7 +42,7 @@ TARGET=XMC_2_GO
 #
 # If APPNAME is edited, ensure to update or regenerate launch
 # configurations for your IDE.
-APPNAME=mtb-example-xmc-empty-app
+APPNAME=EIS_Controller
 
 # Name of toolchain to use. Options include:
 #
