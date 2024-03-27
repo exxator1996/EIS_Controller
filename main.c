@@ -192,7 +192,7 @@ int main(void) {
     CY_ASSERT(0);
   }
   // set operating mode
-  mode = MODE_BP;
+  mode = MODE_RL;
   // Set default output
   PORT0->OMR = MODE_IDLE_OFF_OUT;
 
