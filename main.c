@@ -42,11 +42,14 @@
 #include "cybsp.h"
 #include "cycfg_peripherals.h"
 #include "xmc_ccu4.h"
+#include <math.h>
 #include <stdint.h>
 
-void setPeriodValue(uint32_t periodValue) {
-  uint16_t msbValue = (uint16_t)(periodValue >> 16);
-  uint16_t lsbValue = (uint16_t)(periodValue / (msbValue + 1));
+void setPeriodValue(double periodValue) {
+  uint32_t ticks = (uint32_t)((periodValue * pow(10, 9)) / 2.0 / 31.25);
+
+  uint16_t msbValue = (uint16_t)(ticks >> 16);
+  uint16_t lsbValue = (uint16_t)(ticks / (msbValue + 1));
   XMC_CCU4_SLICE_SetTimerPeriodMatch(timerLSB_HW, lsbValue);
   XMC_CCU4_SLICE_SetTimerPeriodMatch(timerMSB_HW, msbValue);
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
@@ -69,7 +72,7 @@ int main(void) {
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
 
-  setPeriodValue(1600000);
+  setPeriodValue(0.001);
 
   for (;;) {
   }
