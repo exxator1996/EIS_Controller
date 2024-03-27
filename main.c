@@ -100,9 +100,9 @@ uint16_t mode = MODE_IDLE;
 uint16_t state = MODE_IDLE_OFF;
 
 void setPeriod(double_t period) {
-  //timer ticks = periodeValue in s * 10^9(convert into ns) / 2 (duty cycle 50 %) / 31.25 (time between timer ticks)
+  // timer ticks = periodeValue in s * 10^9(convert into ns) / 2 (duty cycle 50 %) / 31.25 (time between timer ticks)
   uint32_t ticks = (uint32_t)round((period * pow(10, 9)) / 2.0 / 31.25);
-  
+
   uint16_t msbValue = (uint16_t)(ticks >> 16);
   uint16_t lsbValue = (uint16_t)(ticks / (msbValue + 1));
 
@@ -111,12 +111,20 @@ void setPeriod(double_t period) {
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
 }
 
-void setFrequency(double_t frequency){
-  setPeriod(1.0 / frequency);
+void setFrequency(double_t frequency) { setPeriod(1.0 / frequency); }
+
+void wait40ms() {
+  XMC_CCU4_SLICE_StartTimer(timer40ms_HW);
+  while (XMC_CCU4_SLICE_IsTimerRunning(timer40ms_HW))
+    ;
+  XMC_CCU4_SLICE_ClearTimer(timer40ms_HW);
 }
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
+
+  // Wait flag set after operating mode switch to give the Tracos sufficient switch on time
+  bool waitFlagg = false;
   // Set next state
   switch (mode) {
   case MODE_RL:
@@ -130,6 +138,7 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
     // When switching from other operatig mode or idle
     default:
       state = MODE_RL_OFF;
+      waitFlagg = true;
     }
     break;
   case MODE_LR:
@@ -143,6 +152,7 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
     // When switching from other operatig mode or idle
     default:
       state = MODE_LR_OFF;
+      waitFlagg = true;
     }
     break;
   case MODE_BP:
@@ -162,31 +172,41 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
     // When switching from other operatig mode or idle
     default:
       state = MODE_BP_RL_OFF;
+      waitFlagg = true;
     }
     break;
   case MODE_IDLE:
     state = MODE_IDLE_OFF;
     break;
   }
-  // Set output state
+  // Set output
   switch (state) {
   case MODE_IDLE_OFF:
     PORT0->OMR = MODE_IDLE_OFF_OUT;
     break;
   case MODE_RL_OFF:
     PORT0->OMR = MODE_RL_OFF_OUT;
+    if (waitFlagg == true) {
+      wait40ms();
+    }
     break;
   case MODE_RL_ON:
     PORT0->OMR = MODE_RL_ON_OUT;
     break;
   case MODE_LR_OFF:
     PORT0->OMR = MODE_LR_OFF_OUT;
+    if (waitFlagg == true) {
+      wait40ms();
+    }
     break;
   case MODE_LR_ON:
     PORT0->OMR = MODE_LR_ON_OUT;
     break;
   case MODE_BP_RL_OFF:
     PORT0->OMR = MODE_BP_OFF_OUT;
+    if (waitFlagg == true) {
+      wait40ms();
+    }
     break;
   case MODE_BP_RL_ON:
     PORT0->OMR = MODE_BP_RL_ON_OUT;
@@ -216,7 +236,7 @@ int main(void) {
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
 
-  setFrequency(856);
+  setFrequency(1000);
 
   for (;;) {
   }
