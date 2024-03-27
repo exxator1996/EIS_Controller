@@ -44,6 +44,14 @@
 #include "xmc_ccu4.h"
 #include <stdint.h>
 
+void setPeriodValue(uint32_t periodValue) {
+  uint16_t msbValue = (uint16_t)(periodValue >> 16);
+  uint16_t lsbValue = (uint16_t)(periodValue / (msbValue + 1));
+  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerLSB_HW, lsbValue);
+  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerMSB_HW, msbValue);
+  XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
+}
+
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
   PORT0->OMR |= (PORT0_OMR_PS5_Msk | PORT0_OMR_PR5_Msk);
@@ -58,16 +66,11 @@ int main(void) {
     CY_ASSERT(0);
   }
 
-  uint32_t periodValue = 160000000U - 1;
-  uint16_t msbValue = (uint16_t)(periodValue >> 16);
-  uint16_t lsbValue = (uint16_t)(periodValue / (msbValue + 1));
-
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
-  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerLSB_HW, lsbValue);
-  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerMSB_HW, msbValue);
-  XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 |
-                                            XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
+
+  setPeriodValue(160000);
+
   for (;;) {
   }
 }
