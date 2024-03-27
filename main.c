@@ -69,7 +69,7 @@ int main(void) {
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
 
-  setPeriodValue(160000);
+  setPeriodValue(1600000);
 
   for (;;) {
   }
