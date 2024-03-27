@@ -3,6 +3,11 @@
     <Devices>
         <Device mpn="XMC1100-Q024x0064">
             <BlockConfig>
+                <Block location="ioss[0].port[0].pin[0]">
+                    <Aliases>
+                        <Alias value="output_pin"/>
+                    </Aliases>
+                </Block>
                 <Block location="ioss[0].port[1].pin[0]">
                     <Aliases>
                         <Alias value="LED_PIN"/>

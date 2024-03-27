@@ -42,6 +42,7 @@
 #include "cybsp.h"
 #include "cycfg_peripherals.h"
 #include "xmc_ccu4.h"
+#include <math.h>
 #include <stdint.h>
 
 // Operating modes
@@ -97,6 +98,22 @@
 uint16_t mode = MODE_IDLE;
 // State variable
 uint16_t state = MODE_IDLE_OFF;
+
+void setPeriod(double_t period) {
+  //timer ticks = periodeValue in s * 10^9(convert into ns) / 2 (duty cycle 50 %) / 31.25 (time between timer ticks)
+  uint32_t ticks = (uint32_t)round((period * pow(10, 9)) / 2.0 / 31.25);
+  
+  uint16_t msbValue = (uint16_t)(ticks >> 16);
+  uint16_t lsbValue = (uint16_t)(ticks / (msbValue + 1));
+
+  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerLSB_HW, lsbValue);
+  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerMSB_HW, msbValue);
+  XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
+}
+
+void setFrequency(double_t frequency){
+  setPeriod(1.0 / frequency);
+}
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
@@ -196,15 +213,10 @@ int main(void) {
   // Set default output
   PORT0->OMR = MODE_IDLE_OFF_OUT;
 
-  uint32_t periodValue = 16000U - 1;
-  uint16_t msbValue = (uint16_t)(periodValue >> 16);
-  uint16_t lsbValue = (uint16_t)(periodValue / (msbValue + 1));
-
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
-  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerLSB_HW, lsbValue);
-  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerMSB_HW, msbValue);
-  XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
+
+  setFrequency(856);
 
   for (;;) {
   }
