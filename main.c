@@ -41,10 +41,11 @@
 #include "cy_utils.h"
 #include "cybsp.h"
 #include "cycfg_peripherals.h"
+#include "modes_states_pins.h"
 #include "xmc_ccu4.h"
 #include <math.h>
 #include <stdint.h>
-#include "modes_states_pins.h"
+
 
 // Operating mode variable
 uint16_t mode = MODE_IDLE;
@@ -76,7 +77,6 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
   // Wait flag set after operating mode switch to give the Tracos sufficient switch on time
-  bool waitFlagg = false;
   // Set next state
   switch (mode) {
   case MODE_RL:
@@ -90,7 +90,6 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
     // When switching from other operatig mode or idle
     default:
       state = MODE_RL_OFF;
-      waitFlagg = true;
     }
     break;
   case MODE_LR:
@@ -104,7 +103,6 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
     // When switching from other operatig mode or idle
     default:
       state = MODE_LR_OFF;
-      waitFlagg = true;
     }
     break;
   case MODE_BP:
@@ -124,7 +122,6 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
     // When switching from other operatig mode or idle
     default:
       state = MODE_BP_RL_OFF;
-      waitFlagg = true;
     }
     break;
   case MODE_IDLE:
@@ -138,27 +135,18 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
     break;
   case MODE_RL_OFF:
     PORT0->OMR = MODE_RL_OFF_OUT;
-    if (waitFlagg == true) {
-      wait40ms();
-    }
     break;
   case MODE_RL_ON:
     PORT0->OMR = MODE_RL_ON_OUT;
     break;
   case MODE_LR_OFF:
     PORT0->OMR = MODE_LR_OFF_OUT;
-    if (waitFlagg == true) {
-      wait40ms();
-    }
     break;
   case MODE_LR_ON:
     PORT0->OMR = MODE_LR_ON_OUT;
     break;
   case MODE_BP_RL_OFF:
     PORT0->OMR = MODE_BP_OFF_OUT;
-    if (waitFlagg == true) {
-      wait40ms();
-    }
     break;
   case MODE_BP_RL_ON:
     PORT0->OMR = MODE_BP_RL_ON_OUT;
@@ -181,15 +169,14 @@ int main(void) {
     CY_ASSERT(0);
   }
   // set operating mode
-  mode = MODE_RL;
+  mode = MODE_LR;
   // Set default output
   PORT0->OMR = MODE_IDLE_OFF_OUT;
 
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
 
-  setFrequency(1000);
-
+  setFrequency(100e-3);
 
   for (;;) {
   }
