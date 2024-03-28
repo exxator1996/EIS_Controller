@@ -46,11 +46,15 @@
 #include <math.h>
 #include <stdint.h>
 
-
 // Operating mode variable
 uint16_t mode = MODE_IDLE;
 // State variable
-uint16_t state = MODE_IDLE_OFF;
+uint16_t state = 0;
+
+uint32_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT, MODE_RL_ON_OUT},
+                               {MODE_LR_OFF_OUT, MODE_LR_ON_OUT, MODE_LR_OFF_OUT, MODE_LR_ON_OUT},
+                               {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
+                               {MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT}};
 
 void setPeriod(double_t period) {
   // timer ticks = periodeValue in s * 10^9(convert into ns) / 2 (duty cycle 50 %) / 31.25 (time between timer ticks)
@@ -64,7 +68,12 @@ void setPeriod(double_t period) {
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
 }
 
-void setFrequency(double_t frequency) { setPeriod(1.0 / frequency); }
+void setFrequency(double_t frequency) {
+  if (mode == MODE_BP)
+    setPeriod(1.0 / frequency / 2);
+  else
+    setPeriod(1.0 / frequency);
+}
 
 void wait40ms() {
   XMC_CCU4_SLICE_StartTimer(timer40ms_HW);
@@ -76,88 +85,16 @@ void wait40ms() {
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
-  // Wait flag set after operating mode switch to give the Tracos sufficient switch on time
-  // Set next state
-  switch (mode) {
-  case MODE_RL:
-    switch (state) {
-    case MODE_RL_OFF:
-      state = MODE_RL_ON;
-      break;
-    case MODE_RL_ON:
-      state = MODE_RL_OFF;
-      break;
-    // When switching from other operatig mode or idle
-    default:
-      state = MODE_RL_OFF;
-    }
-    break;
-  case MODE_LR:
-    switch (state) {
-    case MODE_LR_OFF:
-      state = MODE_LR_ON;
-      break;
-    case MODE_LR_ON:
-      state = MODE_LR_OFF;
-      break;
-    // When switching from other operatig mode or idle
-    default:
-      state = MODE_LR_OFF;
-    }
-    break;
-  case MODE_BP:
-    switch (state) {
-    case MODE_BP_RL_OFF:
-      state = MODE_BP_RL_ON;
-      break;
-    case MODE_BP_RL_ON:
-      state = MODE_BP_LR_OFF;
-      break;
-    case MODE_BP_LR_OFF:
-      state = MODE_BP_LR_ON;
-      break;
-    case MODE_BP_LR_ON:
-      state = MODE_BP_RL_OFF;
-      break;
-    // When switching from other operatig mode or idle
-    default:
-      state = MODE_BP_RL_OFF;
-    }
-    break;
-  case MODE_IDLE:
-    state = MODE_IDLE_OFF;
-    break;
-  }
-  // Set output
-  switch (state) {
-  case MODE_IDLE_OFF:
-    PORT0->OMR = MODE_IDLE_OFF_OUT;
-    break;
-  case MODE_RL_OFF:
-    PORT0->OMR = MODE_RL_OFF_OUT;
-    break;
-  case MODE_RL_ON:
-    PORT0->OMR = MODE_RL_ON_OUT;
-    break;
-  case MODE_LR_OFF:
-    PORT0->OMR = MODE_LR_OFF_OUT;
-    break;
-  case MODE_LR_ON:
-    PORT0->OMR = MODE_LR_ON_OUT;
-    break;
-  case MODE_BP_RL_OFF:
-    PORT0->OMR = MODE_BP_OFF_OUT;
-    break;
-  case MODE_BP_RL_ON:
-    PORT0->OMR = MODE_BP_RL_ON_OUT;
-    break;
-  case MODE_BP_LR_OFF:
-    PORT0->OMR = MODE_BP_OFF_OUT;
-    break;
-  case MODE_BP_LR_ON:
-    PORT0->OMR = MODE_BP_LR_ON_OUT;
-    break;
-  }
+  PORT0->OMR = lookupMatrix[mode][state];
+  // When last state is reached start from the beginning else increment state
+  state = (state == 3) ? 0 : state + 1;
+}
+
+void HardFault_Handler() {
+  PORT0->OMR = MODE_IDLE_OUT;
+  PORT0->OMR = PIN_PRI_1_ON;
+  while (true) {
+  };
 }
 
 int main(void) {
@@ -169,14 +106,14 @@ int main(void) {
     CY_ASSERT(0);
   }
   // set operating mode
-  mode = MODE_LR;
+  mode = MODE_BP;
   // Set default output
-  PORT0->OMR = MODE_IDLE_OFF_OUT;
+  PORT0->OMR = MODE_IDLE_OUT;
 
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
 
-  setFrequency(100e-3);
+  setFrequency(200);
 
   for (;;) {
   }
