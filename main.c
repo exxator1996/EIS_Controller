@@ -69,6 +69,7 @@ void setPeriod(double_t period) {
 }
 
 void setFrequency(double_t frequency) {
+  //Half the period to double the frequency because of switching directions 
   if (mode == MODE_BP)
     setPeriod(1.0 / frequency / 2);
   else
@@ -92,7 +93,6 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
 
 void HardFault_Handler() {
   PORT0->OMR = MODE_IDLE_OUT;
-  PORT0->OMR = PIN_PRI_1_ON;
   while (true) {
   };
 }
