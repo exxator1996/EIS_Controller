@@ -46,53 +46,31 @@
 #include <math.h>
 #include <stdint.h>
 
-// Operating mode variable
-uint16_t mode = MODE_IDLE;
-// State variable
-uint16_t state = 0;
+typedef struct __attribute__((packed)) {
 
-uint32_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT, MODE_RL_ON_OUT},
-                               {MODE_LR_OFF_OUT, MODE_LR_ON_OUT, MODE_LR_OFF_OUT, MODE_LR_ON_OUT},
-                               {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
-                               {MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT}};
+  uint32_t header;
 
-void setPeriod(double_t period) {
-  // timer ticks = periodeValue in s * 10^9(convert into ns) / 2 (duty cycle 50 %) / 31.25 (time between timer ticks)
-  uint32_t ticks = (uint32_t)round((period * pow(10, 9)) / 2.0 / 31.25);
+  uint8_t packetLength;
 
-  uint16_t msbValue = (uint16_t)(ticks >> 16);
-  uint16_t lsbValue = (uint16_t)(ticks / (msbValue + 1));
+  uint16_t buffer[64];
 
-  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerLSB_HW, lsbValue);
-  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerMSB_HW, msbValue);
-  XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
-}
+} i2cPacket_t;
 
-void setFrequency(double_t frequency) {
-  if (mode == MODE_BP)
-    setPeriod(1.0 / frequency / 2);
-  else
-    setPeriod(1.0 / frequency);
-}
+void parseData(uint16_t *buf) {
 
-void wait40ms() {
-  XMC_CCU4_SLICE_StartTimer(timer40ms_HW);
-  while (XMC_CCU4_SLICE_IsTimerRunning(timer40ms_HW))
-    ;
-  XMC_CCU4_SLICE_ClearTimer(timer40ms_HW);
-}
+  uint16_t intBuf[64];
 
-void ccu4_0_SR0_INTERRUPT_HANDLER() {
-  XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
+  uint8_t index = 0;
 
-  PORT0->OMR = lookupMatrix[mode][state];
-  // When last state is reached start from the beginning else increment state
-  state = (state == 3) ? 0 : state + 1;
+  for (index = 0; index < 64; index++) {
+    intBuf[index] = buf[index];
+  }
 }
 
 void HardFault_Handler() {
   PORT0->OMR = MODE_IDLE_OUT;
   PORT0->OMR = PIN_PRI_1_ON;
+  PORT0->OMR = PIN_PRI_2_ON;
   while (true) {
   };
 }
@@ -105,18 +83,11 @@ int main(void) {
   if (result != CY_RSLT_SUCCESS) {
     CY_ASSERT(0);
   }
-  // set operating mode
-  mode = MODE_BP;
   // Set default output
   PORT0->OMR = MODE_IDLE_OUT;
-
-  NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
-  NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
-
-  setFrequency(200);
-
-  for (;;) {
-  }
+  
+  i2cPacket_t i2cPacket;
+  parseData(&i2cPacket.buffer[0]);
 }
 
 /* [] END OF FILE */
