@@ -42,7 +42,10 @@
 #include "cybsp.h"
 #include "cycfg_peripherals.h"
 #include "modes_states_pins.h"
+#include "xmc1_scu.h"
 #include "xmc_ccu4.h"
+#include "xmc_scu.h"
+#include "xmc_wdt.h"
 #include <math.h>
 #include <stdint.h>
 
@@ -69,18 +72,11 @@ void setPeriod(double_t period) {
 }
 
 void setFrequency(double_t frequency) {
-  //Half the period to double the frequency because of switching directions 
+  // Half the period to double the frequency because of switching directions
   if (mode == MODE_BP)
     setPeriod(1.0 / frequency / 2);
   else
     setPeriod(1.0 / frequency);
-}
-
-void wait40ms() {
-  XMC_CCU4_SLICE_StartTimer(timer40ms_HW);
-  while (XMC_CCU4_SLICE_IsTimerRunning(timer40ms_HW))
-    ;
-  XMC_CCU4_SLICE_ClearTimer(timer40ms_HW);
 }
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
@@ -94,7 +90,7 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
 void HardFault_Handler() {
   PORT0->OMR = MODE_IDLE_OUT;
   while (true) {
-  };
+  }
 }
 
 int main(void) {
@@ -105,6 +101,14 @@ int main(void) {
   if (result != CY_RSLT_SUCCESS) {
     CY_ASSERT(0);
   }
+
+  //If last reset caused by watchdog timer 
+  if (XMC_SCU_RESET_REASON_WATCHDOG & XMC_SCU_RESET_GetDeviceResetReason()) {
+    PORT0->OMR = MODE_IDLE_OUT;
+    XMC_SCU_RESET_ClearDeviceResetReason();
+    // Prototype
+  }
+
   // set operating mode
   mode = MODE_BP;
   // Set default output
@@ -113,9 +117,10 @@ int main(void) {
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
 
-  setFrequency(200);
+  setFrequency(0.1);
 
   for (;;) {
+    XMC_WDT_Service();
   }
 }
 
