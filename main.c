@@ -115,6 +115,18 @@ void setPeriodCount(uint32_t periodCountValue) {
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, XMC_CCU4_SHADOW_TRANSFER_SLICE_2);
 }
 
+void startTimers(void) {
+  XMC_CCU4_SLICE_StartTimer(timerMSB_HW);
+  XMC_CCU4_SLICE_StartTimer(timerLSB_HW);
+  XMC_CCU4_SLICE_StartTimer(timerPeriodCount_HW);
+}
+
+void stopTimers(void) {
+  XMC_CCU4_SLICE_StopClearTimer(timerMSB_HW);
+  XMC_CCU4_SLICE_StopClearTimer(timerLSB_HW);
+  XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
+}
+
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_COMPARE_MATCH_UP);
 
@@ -131,10 +143,7 @@ void ccu4_0_SR1_INTERRUPT_HANDLER() {
   PORT0->OMR = MODE_IDLE_OUT;
   mode = MODE_IDLE;
 
-  XMC_CCU4_SLICE_StopClearTimer(timerMSB_HW);
-  XMC_CCU4_SLICE_StopClearTimer(timerLSB_HW);
-
-  XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
+  stopTimers();
 }
 
 void HardFault_Handler() {
@@ -175,9 +184,7 @@ int main(void) {
   NVIC_SetPriority(ccu4_0_SR1_IRQN, 1U);
   NVIC_EnableIRQ(ccu4_0_SR1_IRQN);
 
-  XMC_CCU4_SLICE_StartTimer(timerMSB_HW);
-  XMC_CCU4_SLICE_StartTimer(timerLSB_HW);
-  XMC_CCU4_SLICE_StartTimer(timerPeriodCount_HW);
+  startTimers();
 
   for (;;) {
     XMC_WDT_Service();
