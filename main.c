@@ -59,7 +59,7 @@ uint32_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT
                                {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
                                {MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT}};
 
-void setPeriod(double_t period) {
+void setPeriodTime(double_t period) {
   // timer ticks = periodeValue in s * 10^9(convert into ns) / 2 (duty cycle 50 %) / 31.25 (time between timer ticks)
   uint32_t ticks = (uint32_t)round((period * pow(10, 9)) / 2.0 / 31.25);
 
@@ -68,23 +68,43 @@ void setPeriod(double_t period) {
 
   XMC_CCU4_SLICE_SetTimerPeriodMatch(timerLSB_HW, lsbValue);
   XMC_CCU4_SLICE_SetTimerPeriodMatch(timerMSB_HW, msbValue);
+  XMC_CCU4_SLICE_SetTimerCompareMatch(timerLSB_HW, lsbValue);
+  XMC_CCU4_SLICE_SetTimerCompareMatch(timerMSB_HW, msbValue);
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
 }
 
 void setFrequency(double_t frequency) {
   // Half the period to double the frequency because of switching directions
   if (mode == MODE_BP)
-    setPeriod(1.0 / frequency / 2);
+    setPeriodTime(1.0 / frequency / 2);
   else
-    setPeriod(1.0 / frequency);
+    setPeriodTime(1.0 / frequency);
+}
+
+void setPeriodCount(uint32_t periodCount) {
+  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, periodCount);
+  XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, XMC_CCU4_SHADOW_TRANSFER_SLICE_2);
 }
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
-  XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
+  XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_COMPARE_MATCH_UP);
 
   PORT0->OMR = lookupMatrix[mode][state];
   // When last state is reached start from the beginning else increment state
   state = (state == 3) ? 0 : state + 1;
+}
+
+void ccu4_0_SR1_INTERRUPT_HANDLER(){
+  XMC_CCU4_SLICE_ClearEvent(timerPeriodCount_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
+
+  PORT0->OMR = MODE_IDLE_OUT;
+  mode = MODE_IDLE;
+
+  XMC_CCU4_SLICE_StopClearTimer(timerMSB_HW);
+  XMC_CCU4_SLICE_StopClearTimer(timerLSB_HW);
+
+  XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
+  
 }
 
 void HardFault_Handler() {
@@ -102,7 +122,7 @@ int main(void) {
     CY_ASSERT(0);
   }
 
-  //If last reset caused by watchdog timer 
+  // If last reset caused by watchdog timer
   if (XMC_SCU_RESET_REASON_WATCHDOG & XMC_SCU_RESET_GetDeviceResetReason()) {
     PORT0->OMR = MODE_IDLE_OUT;
     XMC_SCU_RESET_ClearDeviceResetReason();
@@ -110,14 +130,22 @@ int main(void) {
   }
 
   // set operating mode
-  mode = MODE_BP;
+  mode = MODE_LR;
   // Set default output
   PORT0->OMR = MODE_IDLE_OUT;
+
+  setFrequency(1);
+  setPeriodCount(3);
 
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
 
-  setFrequency(0.1);
+  NVIC_SetPriority(ccu4_0_SR1_IRQN,1U);
+  NVIC_EnableIRQ(ccu4_0_SR1_IRQN);
+
+  XMC_CCU4_SLICE_StartTimer(timerMSB_HW);
+  XMC_CCU4_SLICE_StartTimer(timerLSB_HW);
+  XMC_CCU4_SLICE_StartTimer(timerPeriodCount_HW);
 
   for (;;) {
     XMC_WDT_Service();
