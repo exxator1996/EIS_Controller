@@ -53,6 +53,10 @@
 uint16_t mode = MODE_IDLE;
 // State variable
 uint16_t state = 0;
+// Periode counter
+uint16_t periodCounter = 0;
+// Periode count Value
+uint16_t periodValue = 0;
 
 uint32_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT, MODE_RL_ON_OUT},
                                {MODE_LR_OFF_OUT, MODE_LR_ON_OUT, MODE_LR_OFF_OUT, MODE_LR_ON_OUT},
@@ -79,12 +83,23 @@ void setFrequency(double_t frequency) {
     setPeriod(1.0 / frequency);
 }
 
+void setPeriodValue(uint16_t periodValueInput) { periodValue = 1 + (2 * periodValueInput); }
+
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
   PORT0->OMR = lookupMatrix[mode][state];
   // When last state is reached start from the beginning else increment state
   state = (state == 3) ? 0 : state + 1;
+
+  periodCounter++;
+
+  if (periodCounter == periodValue) {
+    mode = MODE_IDLE;
+    PORT0->OMR = MODE_IDLE_OUT;
+    XMC_CCU4_SLICE_StopClearTimer(timerMSB_HW);
+    XMC_CCU4_SLICE_StopClearTimer(timerLSB_HW);
+  }
 }
 
 void HardFault_Handler() {
@@ -102,22 +117,23 @@ int main(void) {
     CY_ASSERT(0);
   }
 
-  //If last reset caused by watchdog timer 
+  // If last reset caused by watchdog timer
   if (XMC_SCU_RESET_REASON_WATCHDOG & XMC_SCU_RESET_GetDeviceResetReason()) {
     PORT0->OMR = MODE_IDLE_OUT;
     XMC_SCU_RESET_ClearDeviceResetReason();
     // Prototype
   }
 
+  setFrequency(0.5);
+  setPeriodValue(4U);
+
   // set operating mode
-  mode = MODE_BP;
+  mode = MODE_LR;
   // Set default output
   PORT0->OMR = MODE_IDLE_OUT;
 
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
-
-  setFrequency(0.1);
 
   for (;;) {
     XMC_WDT_Service();
