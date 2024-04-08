@@ -70,22 +70,17 @@
 #include <stdint.h>
 
 // Operating mode variable
-uint16_t mode = MODE_IDLE;
+mode_t mode    = MODE_IDLE;
 // State variable
 uint16_t state = 0;
 
-uint32_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT, MODE_RL_ON_OUT},
+output_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT, MODE_RL_ON_OUT},
                                {MODE_LR_OFF_OUT, MODE_LR_ON_OUT, MODE_LR_OFF_OUT, MODE_LR_ON_OUT},
                                {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
                                {MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT}};
 
-//TODO Check funcions and add const where it is possible
-
-void setPeriodTime(double_t period) {
-  // timer ticks = periodeValue in s *
-  // 10^9(convert into ns) / 2 (duty
-  // cycle 50 %) / 31.25 (time between
-  // timer ticks)
+void setPeriodTime(double_t const period) {
+  // timer ticks = periodeValue in s * 10^9(convert into ns) / 2 (duty cycle 50 %) / 31.25 (time between timer ticks)
   uint32_t ticks = (uint32_t)round((period * pow(10, 9)) / 2.0 / 31.25);
 
   uint16_t msbValue = (uint16_t)(ticks >> 16);
@@ -98,18 +93,16 @@ void setPeriodTime(double_t period) {
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
 }
 
-void setFrequency(double_t frequency) {
-  // Half the period to double the
-  // frequency because of switching
-  // directions
+void setFrequency(double_t const frequency) {
+  // Half the period to double the frequency because of switching directions
   if (mode == MODE_BP)
     setPeriodTime(1.0 / frequency / 2);
   else
     setPeriodTime(1.0 / frequency);
 }
 
-void setPeriodCount(uint32_t periodCountValue) {
-  if (mode == MODE_LR || mode == MODE_LR) {
+void setPeriodCount(uint32_t const periodCountValue) {
+  if (mode == MODE_RL || mode == MODE_LR) {
     XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (2 * periodCountValue + 1));
   } else if (mode == MODE_BP) {
     XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (4 * periodCountValue + 1));
@@ -133,17 +126,15 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_COMPARE_MATCH_UP);
 
   PORT0->OMR = lookupMatrix[mode][state];
-  // When last state is reached start
-  // from the beginning else increment
-  // state
-  state = (state == 3) ? 0 : state + 1;
+  // When last state is reached start from the beginning else increment state
+  state      = (state == 3) ? 0 : state + 1;
 }
 
 void ccu4_0_SR1_INTERRUPT_HANDLER() {
   XMC_CCU4_SLICE_ClearEvent(timerPeriodCount_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
   PORT0->OMR = MODE_IDLE_OUT;
-  mode = MODE_IDLE;
+  mode       = MODE_IDLE;
 
   stopTimers();
 }
@@ -173,12 +164,12 @@ int main(void) {
   }
 
   // set operating mode
-  mode = MODE_RL;
+  mode       = MODE_BP;
   // Set default output
   PORT0->OMR = MODE_IDLE_OUT;
 
   setFrequency(1);
-  setPeriodCount(30);
+  setPeriodCount(5);
 
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
