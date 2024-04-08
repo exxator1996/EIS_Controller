@@ -79,6 +79,8 @@ uint32_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT
                                {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
                                {MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT}};
 
+//TODO Check funcions and add const where it is possible
+
 void setPeriodTime(double_t period) {
   // timer ticks = periodeValue in s *
   // 10^9(convert into ns) / 2 (duty
@@ -171,12 +173,12 @@ int main(void) {
   }
 
   // set operating mode
-  mode = MODE_BP;
+  mode = MODE_RL;
   // Set default output
   PORT0->OMR = MODE_IDLE_OUT;
 
   setFrequency(1);
-  setPeriodCount(3);
+  setPeriodCount(30);
 
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);

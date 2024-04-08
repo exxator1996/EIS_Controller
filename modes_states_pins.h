@@ -2,7 +2,9 @@
 #define MODES_STATES_PINS_H
 
 #include <XMC1100.h>
+//TODO Change Macros to enums
 // Operating modes
+
 #define MODE_RL   0
 #define MODE_LR   1
 #define MODE_BP   2
