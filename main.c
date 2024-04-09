@@ -95,6 +95,7 @@ void stopTimers(void) {
 }
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
+  //Change output dependt on state and mode
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_COMPARE_MATCH_UP);
 
   PORT0->OMR = lookupMatrix[mode][state];
@@ -103,6 +104,7 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
 }
 
 void ccu4_0_SR1_INTERRUPT_HANDLER() {
+ //Interupt handler after periodCountValue is reached (Increased for each call of SR0_INTERRUPT_HANDLER)
   XMC_CCU4_SLICE_ClearEvent(timerPeriodCount_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
   PORT0->OMR = MODE_IDLE_OUT;
