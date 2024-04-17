@@ -153,6 +153,7 @@ int main(void) {
 
   startTimers();
 
+
   for (;;) {
     XMC_WDT_Service();
   }
