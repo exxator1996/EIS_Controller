@@ -492,8 +492,8 @@
                         <Param id="ProtocolEventSRSel" value="0"/>
                         <Param id="ReceiveBufferErrorEvent" value="false"/>
                         <Param id="ReceiveBufferErrorEventSRSel" value="0"/>
-                        <Param id="ReceiverFrameFinishedEvent" value="true"/>
-                        <Param id="ReceiverInterrupt" value="false"/>
+                        <Param id="ReceiverFrameFinishedEvent" value="false"/>
+                        <Param id="ReceiverInterrupt" value="true"/>
                         <Param id="ReceiverInterruptSRSel" value="0"/>
                         <Param id="ReceiverNoiseDetectionEvent" value="false"/>
                         <Param id="ReceiverStartInterrupt" value="false"/>

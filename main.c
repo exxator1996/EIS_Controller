@@ -67,11 +67,14 @@ void setPeriodTime(double_t const period) {
 }
 
 void setFrequency(double_t const frequency) {
-  // Half the period to double the frequency because of switching directions
-  if (mode == MODE_BP)
-    setPeriodTime(1.0 / frequency / 2);
-  else
-    setPeriodTime(1.0 / frequency);
+  //Only values between 100 mHz and 1 kHz
+  if (frequency >= 0.1 || frequency <= 1000) {
+    // Half the period to double the frequency because of switching directions
+    if (mode == MODE_BP)
+      setPeriodTime(1.0 / frequency / 2);
+    else
+      setPeriodTime(1.0 / frequency);
+  }
 }
 
 void setPeriodCount(uint32_t const periodCountValue) {
@@ -96,7 +99,7 @@ void stopTimers(void) {
 }
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
-  //Change output dependt on state and mode
+  // Change output dependt on state and mode
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_COMPARE_MATCH_UP);
 
   PORT0->OMR = lookupMatrix[mode][state];
@@ -105,13 +108,19 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
 }
 
 void ccu4_0_SR1_INTERRUPT_HANDLER() {
- //Interupt handler after periodCountValue is reached (Increased for each call of SR0_INTERRUPT_HANDLER)
+  // Interupt handler after periodCountValue is reached (Increased for each call of SR0_INTERRUPT_HANDLER)
   XMC_CCU4_SLICE_ClearEvent(timerPeriodCount_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
   PORT0->OMR = MODE_IDLE_OUT;
   mode       = MODE_IDLE;
 
   stopTimers();
+}
+
+void uart_RECEIVE_EVENT_HANDLER() {
+  XMC_UART_CH_ClearStatusFlag(uart_HW, XMC_UART_CH_STATUS_FLAG_RECEIVE_INDICATION);
+  uint16_t newFrequency = XMC_UART_CH_GetReceivedData(uart_HW);
+  setFrequency(newFrequency);
 }
 
 void HardFault_Handler() {
@@ -139,26 +148,28 @@ int main(void) {
   }
 
   // set operating mode
-  mode       = MODE_BP;
+  mode       = MODE_RL;
   // Set default output
   PORT0->OMR = MODE_IDLE_OUT;
 
-  setFrequency(1);
+  setFrequency(1000);
   setPeriodCount(5);
 
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
 
-  NVIC_SetPriority(ccu4_0_SR1_IRQN, 1U);
-  NVIC_EnableIRQ(ccu4_0_SR1_IRQN);
+  //NVIC_SetPriority(ccu4_0_SR1_IRQN, 1U);
+  //NVIC_EnableIRQ(ccu4_0_SR1_IRQN);
+
+  NVIC_SetPriority(uart_RECEIVE_EVENT_IRQN, 2U);
+  NVIC_EnableIRQ(uart_RECEIVE_EVENT_IRQN);
 
   startTimers();
 
-  
+  XMC_UART_CH_Transmit(uart_HW, 't');
 
   for (;;) {
     XMC_WDT_Service();
-    XMC_UART_CH_Transmit(uart_HW, XMC_UART_CH_GetReceivedData(uart_HW));
   }
 }
 
