@@ -37,6 +37,7 @@
 #include "xmc1_scu.h"
 #include "xmc_ccu4.h"
 #include "xmc_scu.h"
+#include "xmc_uart.h"
 #include "xmc_wdt.h"
 #include <math.h>
 #include <stdint.h>
@@ -153,9 +154,11 @@ int main(void) {
 
   startTimers();
 
+  
 
   for (;;) {
     XMC_WDT_Service();
+    XMC_UART_CH_Transmit(uart_HW, XMC_UART_CH_GetReceivedData(uart_HW));
   }
 }
 
