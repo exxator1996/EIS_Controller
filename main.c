@@ -129,7 +129,7 @@ void HardFault_Handler() {
   }
 }
 
-int main(void) {
+ int main(void) {
   cy_rslt_t result;
 
   /* Initialize the device and board
@@ -161,12 +161,12 @@ int main(void) {
   //NVIC_SetPriority(ccu4_0_SR1_IRQN, 1U);
   //NVIC_EnableIRQ(ccu4_0_SR1_IRQN);
 
-  NVIC_SetPriority(uart_RECEIVE_EVENT_IRQN, 2U);
-  NVIC_EnableIRQ(uart_RECEIVE_EVENT_IRQN);
+  //NVIC_SetPriority(uart_RECEIVE_EVENT_IRQN, 2U);
+  //NVIC_EnableIRQ(uart_RECEIVE_EVENT_IRQN);
 
   startTimers();
 
-  XMC_UART_CH_Transmit(uart_HW, 't');
+  //XMC_UART_CH_Transmit(uart_HW, 't');
 
   for (;;) {
     XMC_WDT_Service();
