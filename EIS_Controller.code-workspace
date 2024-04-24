@@ -30,7 +30,7 @@
             "--background-index",
             "--compile-commands-dir=${workspaceFolder}/build"
         ],
-        "cortex-debug.variableUseNaturalFormat": true
+        "cortex-debug.variableUseNaturalFormat": false
     },
     "extensions": {
         "recommendations": [ "marus25.cortex-debug", "ms-vscode.cpptools", "dan-c-underwood.arm" ]
