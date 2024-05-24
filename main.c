@@ -69,7 +69,7 @@ void setPeriodTime(double_t const period) {
 
 void setFrequency(double_t const frequency) {
   // Only values between 100 mHz and 1 kHz
-  if (frequency >= 0.1 || frequency <= 1000) {
+  if (frequency >= 0.1 && frequency <= 10000) {
     // Half the period to double the frequency because of switching directions
     if (mode == MODE_BP)
       setPeriodTime(1.0 / frequency / 2);
@@ -120,16 +120,21 @@ void ccu4_0_SR1_INTERRUPT_HANDLER() {
 
 void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   XMC_USIC_CH_RXFIFO_ClearEvent(uart_HW, XMC_USIC_CH_RXFIFO_EVENT_STANDARD);
-  
+
   uint8_t receivedData[2];
   uint8_t rxIndex = 0;
-  //Read until recive Buffer is empty
+  // Read until recive Buffer is empty
   while (!XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) {
     receivedData[rxIndex++] = XMC_UART_CH_GetReceivedData(uart_HW);
   }
-  //Put together the new Frequency from received Data
+  // Put together the new Frequency from received Data
   uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
-  setFrequency((double_t)newFrequency);
+  //Symbolic value to set 0.1 Hz
+  if (newFrequency == 0xFFFF) {
+    setFrequency(0.1);
+  } else {
+    setFrequency((double_t)newFrequency);
+  }
 }
 
 void HardFault_Handler() {
