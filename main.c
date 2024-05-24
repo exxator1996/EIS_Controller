@@ -53,6 +53,18 @@ output_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT
                                {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
                                {MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT}};
 
+void startTimers(void) {
+  XMC_CCU4_SLICE_StartTimer(timerMSB_HW);
+  XMC_CCU4_SLICE_StartTimer(timerLSB_HW);
+  XMC_CCU4_SLICE_StartTimer(timerPeriodCount_HW);
+}
+
+void stopTimers(void) {
+  XMC_CCU4_SLICE_StopClearTimer(timerMSB_HW);
+  XMC_CCU4_SLICE_StopClearTimer(timerLSB_HW);
+  XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
+}
+
 void setPeriodTime(double_t const period) {
   // timer ticks = periodeValue in s * 10^9(convert into ns) / 2 (duty cycle 50 %) / 31.25 (time between timer ticks)
   uint32_t ticks = (uint32_t)round((period * pow(10, 9)) / 2.0 / 31.25);
@@ -75,6 +87,7 @@ void setFrequency(double_t const frequency) {
       setPeriodTime(1.0 / frequency / 2);
     else
       setPeriodTime(1.0 / frequency);
+    startTimers();
   }
 }
 
@@ -87,16 +100,9 @@ void setPeriodCount(uint32_t const periodCountValue) {
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, XMC_CCU4_SHADOW_TRANSFER_SLICE_2);
 }
 
-void startTimers(void) {
-  XMC_CCU4_SLICE_StartTimer(timerMSB_HW);
-  XMC_CCU4_SLICE_StartTimer(timerLSB_HW);
-  XMC_CCU4_SLICE_StartTimer(timerPeriodCount_HW);
-}
-
-void stopTimers(void) {
-  XMC_CCU4_SLICE_StopClearTimer(timerMSB_HW);
-  XMC_CCU4_SLICE_StopClearTimer(timerLSB_HW);
-  XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
+void stopStimulation(void) {
+  PORT0->OMR = MODE_IDLE_OUT;
+  stopTimers();
 }
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
@@ -129,9 +135,15 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   }
   // Put together the new Frequency from received Data
   uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
-  //Symbolic value to set 0.1 Hz
+
+  // Stop stimulation
+  stopStimulation();
+
+  // Symbolic value FFFF to set 0.1 Hz and 0 to stop
   if (newFrequency == 0xFFFF) {
     setFrequency(0.1);
+  } else if (newFrequency == 0x0000) {
+    stopStimulation();
   } else {
     setFrequency((double_t)newFrequency);
   }
