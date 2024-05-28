@@ -37,6 +37,8 @@
 #include "xmc1_scu.h"
 #include "xmc_ccu4.h"
 #include "xmc_scu.h"
+#include "xmc_uart.h"
+#include "xmc_usic.h"
 #include "xmc_wdt.h"
 #include <math.h>
 #include <stdint.h>
@@ -50,6 +52,18 @@ output_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT
                                {MODE_LR_OFF_OUT, MODE_LR_ON_OUT, MODE_LR_OFF_OUT, MODE_LR_ON_OUT},
                                {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
                                {MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT}};
+
+void startTimers(void) {
+  XMC_CCU4_SLICE_StartTimer(timerMSB_HW);
+  XMC_CCU4_SLICE_StartTimer(timerLSB_HW);
+  XMC_CCU4_SLICE_StartTimer(timerPeriodCount_HW);
+}
+
+void stopTimers(void) {
+  XMC_CCU4_SLICE_StopClearTimer(timerMSB_HW);
+  XMC_CCU4_SLICE_StopClearTimer(timerLSB_HW);
+  XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
+}
 
 void setPeriodTime(double_t const period) {
   // timer ticks = periodeValue in s * 10^9(convert into ns) / 2 (duty cycle 50 %) / 31.25 (time between timer ticks)
@@ -66,11 +80,15 @@ void setPeriodTime(double_t const period) {
 }
 
 void setFrequency(double_t const frequency) {
-  // Half the period to double the frequency because of switching directions
-  if (mode == MODE_BP)
-    setPeriodTime(1.0 / frequency / 2);
-  else
-    setPeriodTime(1.0 / frequency);
+  // Only values between 100 mHz and 1 kHz
+  if (frequency >= 0.1 && frequency <= 10000) {
+    // Half the period to double the frequency because of switching directions
+    if (mode == MODE_BP)
+      setPeriodTime(1.0 / frequency / 2);
+    else
+      setPeriodTime(1.0 / frequency);
+    startTimers();
+  }
 }
 
 void setPeriodCount(uint32_t const periodCountValue) {
@@ -82,20 +100,13 @@ void setPeriodCount(uint32_t const periodCountValue) {
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, XMC_CCU4_SHADOW_TRANSFER_SLICE_2);
 }
 
-void startTimers(void) {
-  XMC_CCU4_SLICE_StartTimer(timerMSB_HW);
-  XMC_CCU4_SLICE_StartTimer(timerLSB_HW);
-  XMC_CCU4_SLICE_StartTimer(timerPeriodCount_HW);
-}
-
-void stopTimers(void) {
-  XMC_CCU4_SLICE_StopClearTimer(timerMSB_HW);
-  XMC_CCU4_SLICE_StopClearTimer(timerLSB_HW);
-  XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
+void stopStimulation(void) {
+  PORT0->OMR = MODE_IDLE_OUT;
+  stopTimers();
 }
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
-  //Change output dependt on state and mode
+  // Change output dependt on state and mode
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_COMPARE_MATCH_UP);
 
   PORT0->OMR = lookupMatrix[mode][state];
@@ -104,13 +115,38 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
 }
 
 void ccu4_0_SR1_INTERRUPT_HANDLER() {
- //Interupt handler after periodCountValue is reached (Increased for each call of SR0_INTERRUPT_HANDLER)
+  // Interupt handler after periodCountValue is reached (Increased for each call of SR0_INTERRUPT_HANDLER)
   XMC_CCU4_SLICE_ClearEvent(timerPeriodCount_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
   PORT0->OMR = MODE_IDLE_OUT;
   mode       = MODE_IDLE;
 
   stopTimers();
+}
+
+void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
+  XMC_USIC_CH_RXFIFO_ClearEvent(uart_HW, XMC_USIC_CH_RXFIFO_EVENT_STANDARD);
+
+  uint8_t receivedData[2];
+  uint8_t rxIndex = 0;
+  // Read until recive Buffer is empty
+  while (!XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) {
+    receivedData[rxIndex++] = XMC_UART_CH_GetReceivedData(uart_HW);
+  }
+  // Put together the new Frequency from received Data
+  uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
+
+  // Stop stimulation
+  stopStimulation();
+
+  // Symbolic value FFFF to set 0.1 Hz and 0 to stop
+  if (newFrequency == 0xFFFF) {
+    setFrequency(0.1);
+  } else if (newFrequency == 0x0000) {
+    stopStimulation();
+  } else {
+    setFrequency((double_t)newFrequency);
+  }
 }
 
 void HardFault_Handler() {
@@ -138,18 +174,21 @@ int main(void) {
   }
 
   // set operating mode
-  mode       = MODE_BP;
+  mode       = MODE_RL;
   // Set default output
   PORT0->OMR = MODE_IDLE_OUT;
 
-  setFrequency(1);
+  setFrequency(0x1f4);
   setPeriodCount(5);
 
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
 
-  NVIC_SetPriority(ccu4_0_SR1_IRQN, 1U);
-  NVIC_EnableIRQ(ccu4_0_SR1_IRQN);
+  // NVIC_SetPriority(ccu4_0_SR1_IRQN, 1U);
+  // NVIC_EnableIRQ(ccu4_0_SR1_IRQN);
+
+  NVIC_SetPriority(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN, 2U);
+  NVIC_EnableIRQ(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN);
 
   startTimers();
 
