@@ -65,11 +65,11 @@ void stopTimers(void) {
   XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
 }
 
-void setPeriodTime(double_t const period) {
+void setPeriodTime(double_t const period, double_t const dutyCycle) {
   // timer ticks period = periodeValue in s * 10^9(convert into ns) / 15.625 (time between timer ticks)
-  uint32_t ticksPeriod  = (uint32_t)round((period * pow(10, 9)) / 15.625);
-  // timer ticks on time 2 (duty cycle 50 %)
-  uint32_t ticksCompare = (uint32_t)round(ticksPeriod / 2.0);
+  uint32_t ticksPeriod  = (uint32_t)round((period * pow(10, 9)) / 15.625) - 1;
+  // timer ticks compare output on for (duty cycle in %)
+  uint32_t ticksCompare = (uint32_t)round(ticksPeriod * dutyCycle / 100.0) - 1;
 
   uint16_t periodMsbValue = (uint16_t)(ticksPeriod >> 16);
   uint16_t periodLsbValue = (uint16_t)(ticksPeriod / (periodMsbValue + 1));
@@ -86,14 +86,14 @@ void setPeriodTime(double_t const period) {
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
 }
 
-void setFrequency(double_t const frequency) {
+void setFrequency(double_t const frequency, double_t const dutyCycle) {
   // Only values between 100 mHz and 10 kHz
   if (frequency >= 0.1 && frequency <= 10000) {
     // Half the period to double the frequency because of switching directions
     if (mode == MODE_BP)
-      setPeriodTime(1.0 / frequency / 2.0);
+      setPeriodTime(1.0 / frequency / 2.0, 2.0);
     else
-      setPeriodTime(1.0 / frequency);
+      setPeriodTime(1.0 / frequency, dutyCycle);
   }
 }
 
@@ -142,29 +142,32 @@ void ccu4_0_SR2_INTERRUPT_HANDLER() {
 void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   XMC_USIC_CH_RXFIFO_ClearEvent(uart_HW, XMC_USIC_CH_RXFIFO_EVENT_STANDARD);
 
-  uint8_t receivedData[2];
+  uint8_t receivedData[4];
   uint8_t rxIndex = 0;
   // Read until recive Buffer is empty
   while (!XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) {
     receivedData[rxIndex++] = XMC_UART_CH_GetReceivedData(uart_HW);
   }
   // Put together the new Frequency from received Data
-  uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
+  uint16_t newFrequency = (receivedData[2] << 8) + receivedData[3];
+
+  //Transform recieved value into duty cycle
+  double_t dutyCycle = ((receivedData[0] << 8) + receivedData[1]) / 100.0;
 
   // Symbolic value FFFF to set 0.1 Hz and 0 to stop
   if (newFrequency == 0xFFFF) {
-    setFrequency(0.1);
+    setFrequency(0.1,dutyCycle);
     startTimers();
   } else if (newFrequency == 0xFFFE) {
-    setFrequency(0.4);
+    setFrequency(0.4,dutyCycle);
     startTimers();
   } else if (newFrequency == 0xFFFD) {
-    setFrequency(0.8);
+    setFrequency(0.8,dutyCycle);
     startTimers();
   } else if (newFrequency == 0x0000) {
     stopStimulation();
   } else {
-    setFrequency((double_t)newFrequency);
+    setFrequency((double_t)newFrequency,dutyCycle);
     startTimers();
   }
 }
@@ -204,17 +207,16 @@ int main(void) {
   NVIC_SetPriority(ccu4_0_SR1_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR1_IRQN);
 
-  //NVIC_SetPriority(ccu4_0_SR2_IRQN, 1U);
-  //NVIC_EnableIRQ(ccu4_0_SR2_IRQN);
+  // NVIC_SetPriority(ccu4_0_SR2_IRQN, 1U);
+  // NVIC_EnableIRQ(ccu4_0_SR2_IRQN);
 
   NVIC_SetPriority(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN, 2U);
   NVIC_EnableIRQ(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN);
 
-  setFrequency(0x0064);
+  setFrequency(0x0064,50);
   setPeriodCount(5);
 
   startTimers();
-
 
   for (;;) {
     XMC_WDT_Service();

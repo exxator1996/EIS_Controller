@@ -497,9 +497,9 @@
                         <Param id="ReceiverInterruptSRSel" value="0"/>
                         <Param id="ReceiverNoiseDetectionEvent" value="false"/>
                         <Param id="ReceiverStartInterrupt" value="false"/>
-                        <Param id="RxFIFOLimit" value="1"/>
+                        <Param id="RxFIFOLimit" value="3"/>
                         <Param id="RxFIFOPointer" value="0"/>
-                        <Param id="RxFIFOSize" value="XMC_USIC_CH_FIFO_SIZE_2WORDS"/>
+                        <Param id="RxFIFOSize" value="XMC_USIC_CH_FIFO_SIZE_4WORDS"/>
                         <Param id="SamplePoint" value="8"/>
                         <Param id="ShowSystemRelatedConnections" value="true"/>
                         <Param id="StandardReceiveBufferEvent" value="true"/>
