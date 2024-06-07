@@ -107,7 +107,6 @@ void setPeriodCount(uint32_t const periodCountValue) {
 }
 
 void stopStimulation(void) {
-  PORT0->OMR = MODE_IDLE_OUT;
   stopTimers();
 }
 
