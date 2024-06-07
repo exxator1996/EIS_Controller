@@ -69,7 +69,7 @@ void setPeriodTime(double_t const period) {
   // timer ticks period = periodeValue in s * 10^9(convert into ns) / 31.25 (time between timer ticks)
   uint32_t ticksPeriod  = (uint32_t)round((period * pow(10, 9)) / 31.25);
   // timer ticks on time 2 (duty cycle 50 %)
-  uint32_t ticksCompare = (uint32_t)round(ticksPeriod / 4.0);
+  uint32_t ticksCompare = (uint32_t)round(ticksPeriod / 2.0);
 
   uint16_t periodMsbValue = (uint16_t)(ticksPeriod >> 16);
   uint16_t periodLsbValue = (uint16_t)(ticksPeriod / (periodMsbValue + 1));
@@ -87,14 +87,13 @@ void setPeriodTime(double_t const period) {
 }
 
 void setFrequency(double_t const frequency) {
-  // Only values between 100 mHz and 1 kHz
+  // Only values between 100 mHz and 10 kHz
   if (frequency >= 0.1 && frequency <= 10000) {
     // Half the period to double the frequency because of switching directions
     if (mode == MODE_BP)
-      setPeriodTime(1.0 / frequency / 2);
+      setPeriodTime(1.0 / frequency / 2.0);
     else
       setPeriodTime(1.0 / frequency);
-    startTimers();
   }
 }
 
@@ -131,7 +130,7 @@ void ccu4_0_SR1_INTERRUPT_HANDLER() {
 }
 
 void ccu4_0_SR2_INTERRUPT_HANDLER() {
-  // Interupt handler after periodCountValue is reached (Increased for each call of SR0_INTERRUPT_HANDLER)
+  // Interupt handler after periodCountValue is reached (Increased for each call of SR0 and SR1 INTERRUPT_HANDLER)
   XMC_CCU4_SLICE_ClearEvent(timerPeriodCount_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
   PORT0->OMR = MODE_IDLE_OUT;
@@ -155,10 +154,18 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   // Symbolic value FFFF to set 0.1 Hz and 0 to stop
   if (newFrequency == 0xFFFF) {
     setFrequency(0.1);
+    startTimers();
+  } else if (newFrequency == 0xFFFE) {
+    setFrequency(0.4);
+    startTimers();
+  } else if (newFrequency == 0xFFFD) {
+    setFrequency(0.8);
+    startTimers();
   } else if (newFrequency == 0x0000) {
     stopStimulation();
   } else {
     setFrequency((double_t)newFrequency);
+    startTimers();
   }
 }
 
@@ -191,9 +198,6 @@ int main(void) {
   // Set default output
   PORT0->OMR = MODE_IDLE_OUT;
 
-  setFrequency(0x1f4);
-  setPeriodCount(5);
-
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
 
@@ -206,7 +210,11 @@ int main(void) {
   NVIC_SetPriority(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN, 2U);
   NVIC_EnableIRQ(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN);
 
+  setFrequency(0x1f4);
+  setPeriodCount(5);
+
   startTimers();
+
 
   for (;;) {
     XMC_WDT_Service();
