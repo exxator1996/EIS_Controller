@@ -66,16 +66,23 @@ void stopTimers(void) {
 }
 
 void setPeriodTime(double_t const period) {
-  // timer ticks = periodeValue in s * 10^9(convert into ns) / 2 (duty cycle 50 %) / 31.25 (time between timer ticks)
-  uint32_t ticks = (uint32_t)round((period * pow(10, 9)) / 2.0 / 31.25);
+  // timer ticks period = periodeValue in s * 10^9(convert into ns) / 31.25 (time between timer ticks)
+  uint32_t ticksPeriod  = (uint32_t)round((period * pow(10, 9)) / 31.25);
+  // timer ticks on time 2 (duty cycle 50 %)
+  uint32_t ticksCompare = (uint32_t)round(ticksPeriod / 4.0);
 
-  uint16_t msbValue = (uint16_t)(ticks >> 16);
-  uint16_t lsbValue = (uint16_t)(ticks / (msbValue + 1));
+  uint16_t periodMsbValue = (uint16_t)(ticksPeriod >> 16);
+  uint16_t periodLsbValue = (uint16_t)(ticksPeriod / (periodMsbValue + 1));
 
-  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerLSB_HW, lsbValue);
-  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerMSB_HW, msbValue);
-  XMC_CCU4_SLICE_SetTimerCompareMatch(timerLSB_HW, lsbValue);
-  XMC_CCU4_SLICE_SetTimerCompareMatch(timerMSB_HW, msbValue);
+  uint16_t compareMsbValue = (uint16_t)(ticksCompare >> 16);
+  uint16_t compareLsbValue = (uint16_t)(ticksCompare / (compareMsbValue + 1));
+
+  XMC_CCU4_SLICE_SetTimerCompareMatch(timerLSB_HW, compareLsbValue);
+  XMC_CCU4_SLICE_SetTimerCompareMatch(timerMSB_HW, compareMsbValue);
+
+  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerLSB_HW, periodLsbValue);
+  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerMSB_HW, periodMsbValue);
+
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
 }
 
@@ -115,6 +122,15 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
 }
 
 void ccu4_0_SR1_INTERRUPT_HANDLER() {
+  // Change output dependt on state and mode
+  XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
+
+  PORT0->OMR = lookupMatrix[mode][state];
+  // When last state is reached start from the beginning else increment state
+  state      = (state == 3) ? 0 : state + 1;
+}
+
+void ccu4_0_SR2_INTERRUPT_HANDLER() {
   // Interupt handler after periodCountValue is reached (Increased for each call of SR0_INTERRUPT_HANDLER)
   XMC_CCU4_SLICE_ClearEvent(timerPeriodCount_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
@@ -135,9 +151,6 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   }
   // Put together the new Frequency from received Data
   uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
-
-  // Stop stimulation
-  stopStimulation();
 
   // Symbolic value FFFF to set 0.1 Hz and 0 to stop
   if (newFrequency == 0xFFFF) {
@@ -184,8 +197,11 @@ int main(void) {
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
 
-  // NVIC_SetPriority(ccu4_0_SR1_IRQN, 1U);
-  // NVIC_EnableIRQ(ccu4_0_SR1_IRQN);
+  NVIC_SetPriority(ccu4_0_SR1_IRQN, 0U);
+  NVIC_EnableIRQ(ccu4_0_SR1_IRQN);
+
+  //NVIC_SetPriority(ccu4_0_SR2_IRQN, 1U);
+  //NVIC_EnableIRQ(ccu4_0_SR2_IRQN);
 
   NVIC_SetPriority(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN, 2U);
   NVIC_EnableIRQ(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN);
