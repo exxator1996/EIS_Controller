@@ -1,0 +1,4 @@
+HOSTNAME=NiklasLaptop
+PID=21940
+PIPE=\\.\PIPE\bcf91dce-4ca3-4952-8324-aa36bdb64475
+LIBRARIES=C:/Users/niklas/Documents/Bachelor/Code/EIS_Controller/mtb_shared/mtb-xmclib-cat3/release-v4.3.0/props.json;C:/Users/niklas/.modustoolbox/global/device-db/release-v4.11.1/props.json

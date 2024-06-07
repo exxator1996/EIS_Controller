@@ -431,7 +431,7 @@
                 <Personality template="xmc1_pclk" version="1.0">
                     <Block location="scu[0].clock[0].ccuclk[0]" locked="true"/>
                     <Parameters>
-                        <Param id="pclk_src" value="XMC_SCU_CLOCK_PCLKSRC_MCLK"/>
+                        <Param id="pclk_src" value="XMC_SCU_CLOCK_PCLKSRC_DOUBLE_MCLK"/>
                     </Parameters>
                 </Personality>
                 <Personality template="xmc1_dco1" version="1.0">

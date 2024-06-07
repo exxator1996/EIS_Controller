@@ -66,8 +66,8 @@ void stopTimers(void) {
 }
 
 void setPeriodTime(double_t const period) {
-  // timer ticks period = periodeValue in s * 10^9(convert into ns) / 31.25 (time between timer ticks)
-  uint32_t ticksPeriod  = (uint32_t)round((period * pow(10, 9)) / 31.25);
+  // timer ticks period = periodeValue in s * 10^9(convert into ns) / 15.625 (time between timer ticks)
+  uint32_t ticksPeriod  = (uint32_t)round((period * pow(10, 9)) / 15.625);
   // timer ticks on time 2 (duty cycle 50 %)
   uint32_t ticksCompare = (uint32_t)round(ticksPeriod / 2.0);
 
@@ -210,7 +210,7 @@ int main(void) {
   NVIC_SetPriority(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN, 2U);
   NVIC_EnableIRQ(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN);
 
-  setFrequency(0x1f4);
+  setFrequency(0x0064);
   setPeriodCount(5);
 
   startTimers();
