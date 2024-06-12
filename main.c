@@ -108,6 +108,7 @@ void setPeriodCount(uint32_t const periodCountValue) {
 
 void stopStimulation(void) {
   stopTimers();
+  PORT0->OMR = lookupMatrix[mode][0];
 }
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
@@ -151,7 +152,7 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   uint16_t newFrequency = (receivedData[2] << 8) + receivedData[3];
 
   //Transform recieved value into duty cycle
-  double_t dutyCycle = ((receivedData[0] << 8) + receivedData[1]) / 100.0;
+  double_t dutyCycle = receivedData[1] / 1.0;
 
   // Symbolic value FFFF to set 0.1 Hz and 0 to stop
   if (newFrequency == 0xFFFF) {
