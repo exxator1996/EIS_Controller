@@ -53,16 +53,14 @@ output_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT
                                {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
                                {MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT}};
 
-void startTimers(void) {
+void startFreqTimers(void) {
   XMC_CCU4_SLICE_StartTimer(timerMSB_HW);
   XMC_CCU4_SLICE_StartTimer(timerLSB_HW);
-  XMC_CCU4_SLICE_StartTimer(timerPeriodCount_HW);
 }
 
-void stopTimers(void) {
+void stopFreqTimers(void) {
   XMC_CCU4_SLICE_StopClearTimer(timerMSB_HW);
   XMC_CCU4_SLICE_StopClearTimer(timerLSB_HW);
-  XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
 }
 
 void setPeriodTime(double_t const period, double_t const dutyCycle) {
@@ -91,23 +89,25 @@ void setFrequency(double_t const frequency, double_t const dutyCycle) {
   if (frequency >= 0.1 && frequency <= 10000) {
     // Half the period to double the frequency because of switching directions
     if (mode == MODE_BP)
-      setPeriodTime(1.0 / frequency / 2.0, 2.0);
+      setPeriodTime(1.0 / frequency / 2.0, dutyCycle);
     else
       setPeriodTime(1.0 / frequency, dutyCycle);
   }
 }
 
-void setPeriodCount(uint32_t const periodCountValue) {
+void setPeriodCount(uint8_t const periodCountValue) {
+  XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
   if (mode == MODE_RL || mode == MODE_LR) {
     XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (2 * periodCountValue + 1));
   } else if (mode == MODE_BP) {
     XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (4 * periodCountValue + 1));
   }
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, XMC_CCU4_SHADOW_TRANSFER_SLICE_2);
+  XMC_CCU4_SLICE_StartTimer(timerPeriodCount_HW);
 }
 
 void stopStimulation(void) {
-  stopTimers();
+  stopFreqTimers();
   PORT0->OMR = lookupMatrix[mode][0];
 }
 
@@ -133,10 +133,9 @@ void ccu4_0_SR2_INTERRUPT_HANDLER() {
   // Interupt handler after periodCountValue is reached (Increased for each call of SR0 and SR1 INTERRUPT_HANDLER)
   XMC_CCU4_SLICE_ClearEvent(timerPeriodCount_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
-  PORT0->OMR = MODE_IDLE_OUT;
-  mode       = MODE_IDLE;
+  PORT0->OMR = lookupMatrix[mode][0];
 
-  stopTimers();
+  stopFreqTimers();
 }
 
 void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
@@ -151,24 +150,49 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   // Put together the new Frequency from received Data
   uint16_t newFrequency = (receivedData[2] << 8) + receivedData[3];
 
-  //Transform recieved value into duty cycle
+  // Transform recieved value into duty cycle
   double_t dutyCycle = receivedData[1] / 1.0;
 
-  // Symbolic value FFFF to set 0.1 Hz and 0 to stop
-  if (newFrequency == 0xFFFF) {
-    setFrequency(0.1,dutyCycle);
-    startTimers();
-  } else if (newFrequency == 0xFFFE) {
-    setFrequency(0.4,dutyCycle);
-    startTimers();
-  } else if (newFrequency == 0xFFFD) {
-    setFrequency(0.8,dutyCycle);
-    startTimers();
-  } else if (newFrequency == 0x0000) {
+  // Get period count value
+  uint8_t periodCount = receivedData[0];
+
+  // When duty cycle receivedData is FF,FE,FD that means that a mode change is required
+  //When mode change stop stimulation and set state to zero 
+  if (receivedData[1] == 0xFF) {
     stopStimulation();
-  } else {
-    setFrequency((double_t)newFrequency,dutyCycle);
-    startTimers();
+    state = 0;
+    mode = MODE_LR;
+  } else if (receivedData[1] == 0xFE) {
+    stopStimulation();
+    state = 0;
+    mode = MODE_RL;
+  } else if (receivedData[1] == 0xFD) {
+    stopStimulation();
+    state = 0;
+    mode = MODE_BP;
+  } else if (dutyCycle >= 0 && dutyCycle <= 100) {
+   
+    // Set period count (0 is free running)
+    if (periodCount != 0) {
+      setPeriodCount(periodCount);
+    }
+
+    // Symbolic value FFFF to set 0.1 Hz and 0 to stop
+    if (newFrequency == 0xFFFF) {
+      setFrequency(0.1, dutyCycle);
+      startFreqTimers();
+    } else if (newFrequency == 0xFFFE) {
+      setFrequency(0.4, dutyCycle);
+      startFreqTimers();
+    } else if (newFrequency == 0xFFFD) {
+      setFrequency(0.8, dutyCycle);
+      startFreqTimers();
+    } else if (newFrequency == 0x0000) {
+      stopStimulation();
+    } else {
+      setFrequency((double_t)newFrequency, dutyCycle);
+      startFreqTimers();
+    }
   }
 }
 
@@ -197,7 +221,7 @@ int main(void) {
   }
 
   // set operating mode
-  mode       = MODE_RL;
+  mode       = MODE_BP;
   // Set default output
   PORT0->OMR = MODE_IDLE_OUT;
 
@@ -207,16 +231,16 @@ int main(void) {
   NVIC_SetPriority(ccu4_0_SR1_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR1_IRQN);
 
-  // NVIC_SetPriority(ccu4_0_SR2_IRQN, 1U);
-  // NVIC_EnableIRQ(ccu4_0_SR2_IRQN);
+  NVIC_SetPriority(ccu4_0_SR2_IRQN, 1U);
+  NVIC_EnableIRQ(ccu4_0_SR2_IRQN);
 
   NVIC_SetPriority(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN, 2U);
   NVIC_EnableIRQ(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN);
 
-  setFrequency(0x0064,50);
+  setFrequency(0x000A, 50);
   setPeriodCount(5);
 
-  startTimers();
+  startFreqTimers();
 
   for (;;) {
     XMC_WDT_Service();
