@@ -237,11 +237,6 @@ int main(void) {
   NVIC_SetPriority(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN, 2U);
   NVIC_EnableIRQ(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN);
 
-  setFrequency(0x000A, 50);
-  setPeriodCount(5);
-
-  startFreqTimers();
-
   for (;;) {
     XMC_WDT_Service();
   }
