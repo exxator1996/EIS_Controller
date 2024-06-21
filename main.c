@@ -217,7 +217,7 @@ int main(void) {
   if (XMC_SCU_RESET_REASON_WATCHDOG & XMC_SCU_RESET_GetDeviceResetReason()) {
     PORT0->OMR = MODE_IDLE_OUT;
     XMC_SCU_RESET_ClearDeviceResetReason();
-    // Prototype
+    while (true) ;
   }
 
   // set operating mode
