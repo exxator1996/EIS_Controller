@@ -157,19 +157,22 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   uint8_t periodCount = receivedData[0];
 
   // When duty cycle receivedData is FF,FE,FD that means that a mode change is required
-  //When mode change stop stimulation and set state to zero 
+  //When mode change stop stimulation and set state to zero after this set output port to the modes zero state to start the tracos
   if (receivedData[1] == 0xFF) {
     stopStimulation();
     state = 0;
     mode = MODE_LR;
+    PORT0->OMR = lookupMatrix[mode][state];
   } else if (receivedData[1] == 0xFE) {
     stopStimulation();
     state = 0;
     mode = MODE_RL;
+    PORT0->OMR = lookupMatrix[mode][state];
   } else if (receivedData[1] == 0xFD) {
     stopStimulation();
     state = 0;
     mode = MODE_BP;
+    PORT0->OMR = lookupMatrix[mode][state];
   } else if (dutyCycle >= 0 && dutyCycle <= 100) {
    
     // Set period count (0 is free running)
