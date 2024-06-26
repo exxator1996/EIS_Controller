@@ -43,11 +43,11 @@
 #include <math.h>
 #include <stdint.h>
 
-// Operating mode variable
-mode_t mode    = MODE_IDLE;
-// State variable
-uint16_t state = 0;
-
+// Betriebsmodus Variable
+mode_t mode                 = MODE_IDLE;
+// Zustands variable
+uint16_t state              = 0;
+// Zeile 1 = RL / Zeile 2 = LR / Zeile 3 = BP / Zeile 4 = IDLE
 output_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT, MODE_RL_ON_OUT},
                                {MODE_LR_OFF_OUT, MODE_LR_ON_OUT, MODE_LR_OFF_OUT, MODE_LR_ON_OUT},
                                {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
@@ -66,7 +66,7 @@ void stopFreqTimers(void) {
 void setPeriodTime(double_t const period, double_t const dutyCycle) {
   // timer ticks period = periodeValue in s * 10^9(convert into ns) / 15.625 (time between timer ticks)
   uint32_t ticksPeriod  = (uint32_t)round((period * pow(10, 9)) / 15.625) - 1;
-  // timer ticks compare output on for (duty cycle in %)
+  // timer ticks compare output on for duty cycle in %
   uint32_t ticksCompare = (uint32_t)round(ticksPeriod * dutyCycle / 100.0) - 1;
 
   uint16_t periodMsbValue = (uint16_t)(ticksPeriod >> 16);
@@ -85,9 +85,9 @@ void setPeriodTime(double_t const period, double_t const dutyCycle) {
 }
 
 void setFrequency(double_t const frequency, double_t const dutyCycle) {
-  // Only values between 100 mHz and 10 kHz
+  // Nur Frequenzen zwischen 100 mHz und 10 kHz
   if (frequency >= 0.1 && frequency <= 10000) {
-    // Half the period to double the frequency because of switching directions
+    // Halbieren der Periode um die Frequenz zu verdoppeln weil hier zwei ausgänge angesteuert werden müssen
     if (mode == MODE_BP)
       setPeriodTime(1.0 / frequency / 2.0, dutyCycle);
     else
@@ -108,34 +108,33 @@ void setPeriodCount(uint8_t const periodCountValue) {
 
 void stopStimulation(void) {
   stopFreqTimers();
+  // Sichereren Zustand herstellen
   PORT0->OMR = lookupMatrix[mode][0];
+  state      = 0;
 }
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
-  // Change output dependt on state and mode
+  // Ändern des Zustands in abhängikeit von Betriebsmodus und Zustand
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_COMPARE_MATCH_UP);
 
   PORT0->OMR = lookupMatrix[mode][state];
-  // When last state is reached start from the beginning else increment state
+  // Wenn der letzte Zustand ereicht ist, wird von vorne begonnen, ansonsten wird der Zustand inkrementiert
   state      = (state == 3) ? 0 : state + 1;
 }
 
 void ccu4_0_SR1_INTERRUPT_HANDLER() {
-  // Change output dependt on state and mode
+  // Ändern des Zustands in abhängikeit von Betriebsmodus und Zustand
   XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
   PORT0->OMR = lookupMatrix[mode][state];
-  // When last state is reached start from the beginning else increment state
+  // Wenn der letzte Zustand ereicht ist, wird von vorne begonnen, ansonsten wird der Zustand inkrementiert
   state      = (state == 3) ? 0 : state + 1;
 }
 
 void ccu4_0_SR2_INTERRUPT_HANDLER() {
-  // Interupt handler after periodCountValue is reached (Increased for each call of SR0 and SR1 INTERRUPT_HANDLER)
+  // Interupt handler nachdem periodCountValue ereicht ist (Wird für jeden compare und period Match erhöht)
   XMC_CCU4_SLICE_ClearEvent(timerPeriodCount_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
-
-  PORT0->OMR = lookupMatrix[mode][0];
-
-  stopFreqTimers();
+  stopStimulation();
 }
 
 void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
@@ -143,44 +142,45 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
 
   uint8_t receivedData[4];
   uint8_t rxIndex = 0;
-  // Read until recive Buffer is empty
+  // Lesen der Daten bis der Input Puffer leer ist
   while (!XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) {
     receivedData[rxIndex++] = XMC_UART_CH_GetReceivedData(uart_HW);
   }
-  // Put together the new Frequency from received Data
+  // Frequenz wert aus den letzten empfangenen bytes zusammen setzen
   uint16_t newFrequency = (receivedData[2] << 8) + receivedData[3];
 
-  // Transform recieved value into duty cycle
+  // Umwandeln des Empfangenen Wertes um den Tastgrad zu erhalten
   double_t dutyCycle = receivedData[1] / 1.0;
 
-  // Get period count value
+  // Anzahl der Perioden 
   uint8_t periodCount = receivedData[0];
 
-  // When duty cycle receivedData is FF,FE,FD that means that a mode change is required
-  //When mode change stop stimulation and set state to zero after this set output port to the modes zero state to start the tracos
-  if (receivedData[1] == 0xFF) {
+  // Wenn die Frequenz 0 empfangen wird wird die Anregung sofort gestoppt
+  // Ansonsten wird geprüft ob über den Tastgrad eine kodierte Anweisung (FF, FD oder FE) zum Moduswechsel übertragen wird
+  // Wenn ein Modus wechsel durchgeführt wird zunächst die Anregung gestoppt und dann der Startzustand des Modus auf den Port ausgegeben
+  //!Nach einem Moduswechsel sollte mindestens 30 ms gewartet werden, damit die Tracos sich initialisieren können
+  if (newFrequency == 0) {
     stopStimulation();
-    state = 0;
-    mode = MODE_LR;
+  } else if (receivedData[1] == 0xFF) {
+    stopStimulation();
+    mode       = MODE_LR;
     PORT0->OMR = lookupMatrix[mode][state];
   } else if (receivedData[1] == 0xFE) {
     stopStimulation();
-    state = 0;
-    mode = MODE_RL;
+    mode       = MODE_RL;
     PORT0->OMR = lookupMatrix[mode][state];
   } else if (receivedData[1] == 0xFD) {
     stopStimulation();
-    state = 0;
-    mode = MODE_BP;
+    mode       = MODE_BP;
     PORT0->OMR = lookupMatrix[mode][state];
   } else if (dutyCycle >= 0 && dutyCycle <= 100) {
-   
-    // Set period count (0 is free running)
+
+    // Perioden Zähler setzen (0 = Keine begrezung der Periodenzahl)
     if (periodCount != 0) {
       setPeriodCount(periodCount);
     }
 
-    // Symbolic value FFFF to set 0.1 Hz and 0 to stop
+    // Kodierte werte für Frequenzen mit Dezimalstelle
     if (newFrequency == 0xFFFF) {
       setFrequency(0.1, dutyCycle);
       startFreqTimers();
@@ -190,8 +190,6 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
     } else if (newFrequency == 0xFFFD) {
       setFrequency(0.8, dutyCycle);
       startFreqTimers();
-    } else if (newFrequency == 0x0000) {
-      stopStimulation();
     } else {
       setFrequency((double_t)newFrequency, dutyCycle);
       startFreqTimers();
@@ -215,17 +213,17 @@ int main(void) {
     CY_ASSERT(0);
   }
 
-  // If last reset caused by watchdog
-  // timer
+  // Wenn der letzte Reset vom Watchdog Timer verursacht wurde sicheren Zustand herstellen
   if (XMC_SCU_RESET_REASON_WATCHDOG & XMC_SCU_RESET_GetDeviceResetReason()) {
     PORT0->OMR = MODE_IDLE_OUT;
     XMC_SCU_RESET_ClearDeviceResetReason();
-    while (true) ;
+    while (true)
+      ;
   }
 
-  // set operating mode
+  // Start Betriebsmodus
   mode       = MODE_BP;
-  // Set default output
+  // Start Ausgabe
   PORT0->OMR = MODE_IDLE_OUT;
 
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
