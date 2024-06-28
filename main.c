@@ -152,13 +152,14 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   // Umwandeln des Empfangenen Wertes um den Tastgrad zu erhalten
   double_t dutyCycle = receivedData[1] / 1.0;
 
-  // Anzahl der Perioden 
+  // Anzahl der Perioden
   uint8_t periodCount = receivedData[0];
 
   // Wenn die Frequenz 0 empfangen wird wird die Anregung sofort gestoppt
-  // Ansonsten wird geprüft ob über den Tastgrad eine kodierte Anweisung (FF, FD oder FE) zum Moduswechsel übertragen wird
-  // Wenn ein Modus wechsel durchgeführt wird zunächst die Anregung gestoppt und dann der Startzustand des Modus auf den Port ausgegeben
-  //!Nach einem Moduswechsel sollte mindestens 30 ms gewartet werden, damit die Tracos sich initialisieren können
+  // Ansonsten wird geprüft ob über den Tastgrad eine kodierte Anweisung (FF, FD oder FE) zum Moduswechsel übertragen
+  // wird Wenn ein Modus wechsel durchgeführt wird zunächst die Anregung gestoppt und dann der Startzustand des Modus
+  // auf den Port ausgegeben
+  //! Nach einem Moduswechsel sollte mindestens 30 ms gewartet werden, damit die Tracos sich initialisieren können
   if (newFrequency == 0) {
     stopStimulation();
   } else if (receivedData[1] == 0xFF) {
@@ -172,6 +173,10 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   } else if (receivedData[1] == 0xFD) {
     stopStimulation();
     mode       = MODE_BP;
+    PORT0->OMR = lookupMatrix[mode][state];
+  } else if (receivedData[1] == 0xFC) {
+    stopStimulation();
+    mode       = MODE_IDLE;
     PORT0->OMR = lookupMatrix[mode][state];
   } else if (dutyCycle >= 0 && dutyCycle <= 100) {
 
@@ -222,7 +227,7 @@ int main(void) {
   }
 
   // Start Betriebsmodus
-  mode       = MODE_BP;
+  mode       = MODE_IDLE;
   // Start Ausgabe
   PORT0->OMR = MODE_IDLE_OUT;
 
