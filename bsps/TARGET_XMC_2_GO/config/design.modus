@@ -527,7 +527,7 @@
                     <Block location="wdt[0]" locked="true"/>
                     <Parameters>
                         <Param id="desired_ms_wlb" value="0.00"/>
-                        <Param id="desired_ms_wub" value="10.00"/>
+                        <Param id="desired_ms_wub" value="20.00"/>
                         <Param id="enable_pwa" value="false"/>
                         <Param id="event_handler_pwa" value="wdt_0_EventHandler"/>
                         <Param id="inFlash" value="true"/>

@@ -146,6 +146,8 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   while (!XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) {
     receivedData[rxIndex++] = XMC_UART_CH_GetReceivedData(uart_HW);
   }
+  //Leeren um Fehler zu vermeiden
+  XMC_USIC_CH_RXFIFO_Flush(uart_HW);
   // Frequenz wert aus den letzten empfangenen bytes zusammen setzen
   uint16_t newFrequency = (receivedData[2] << 8) + receivedData[3];
 
