@@ -75,6 +75,12 @@ void setPeriodTime(double_t const period, double_t const dutyCycle) {
   uint16_t compareMsbValue = (uint16_t)(ticksCompare >> 16);
   uint16_t compareLsbValue = (uint16_t)(ticksCompare / (compareMsbValue + 1));
 
+  //!Compare Wert darf nicht größer als Period Wert sein -> Neu Berechnung
+  if (periodLsbValue < compareLsbValue) {
+    compareLsbValue = periodLsbValue;
+    compareMsbValue = (uint16_t)(ticksCompare / (compareLsbValue + 1));
+  }
+
   XMC_CCU4_SLICE_SetTimerCompareMatch(timerLSB_HW, compareLsbValue);
   XMC_CCU4_SLICE_SetTimerCompareMatch(timerMSB_HW, compareMsbValue);
 
@@ -197,8 +203,6 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
     } else if (newFrequency == 0xFFFD) {
       setFrequency(0.8, dutyCycle);
       startFreqTimers();
-    } else if (newFrequency == 0) {
-      stopStimulation();
     } else {
       setFrequency((double_t)newFrequency, dutyCycle);
       startFreqTimers();

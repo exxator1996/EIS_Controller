@@ -25,7 +25,7 @@
                         <Param id="capture1_function" value="XMC_CCU4_SLICE_EVENT_NONE"/>
                         <Param id="compare_counting_mode" value="XMC_CCU4_SLICE_TIMER_COUNT_MODE_EA"/>
                         <Param id="compare_down_event_sr" value="0"/>
-                        <Param id="compare_up_match_event_sr" value="1"/>
+                        <Param id="compare_up_match_event_sr" value="0"/>
                         <Param id="count_function" value="XMC_CCU4_SLICE_EVENT_NONE"/>
                         <Param id="direction_function" value="XMC_CCU4_SLICE_EVENT_NONE"/>
                         <Param id="dither_compare_value" value="0"/>
@@ -81,7 +81,7 @@
                         <Param id="output_passive_level" value="XMC_CCU4_SLICE_OUTPUT_PASSIVE_LEVEL_LOW"/>
                         <Param id="override_trigger_function" value="XMC_CCU4_SLICE_EVENT_NONE"/>
                         <Param id="override_value_function" value="XMC_CCU4_SLICE_EVENT_NONE"/>
-                        <Param id="period_match_event_sr" value="0"/>
+                        <Param id="period_match_event_sr" value="1"/>
                         <Param id="prescaler_initial_value" value="1"/>
                         <Param id="prescaler_mode" value="XMC_CCU4_SLICE_PRESCALER_MODE_NORMAL"/>
                         <Param id="shadow_transfer_mode" value="XMC_CCU4_SLICE_SHADOW_TRANSFER_MODE_IN_PERIOD_MATCH_AND_ONE_MATCH"/>
@@ -93,7 +93,7 @@
                         <Param id="timer_clear_control" value="XMC_CCU4_SLICE_TIMER_CLEAR_MODE_NEVER"/>
                         <Param id="timer_compare_value" value="0"/>
                         <Param id="timer_initial_value" value="0"/>
-                        <Param id="timer_period_value" value="4000"/>
+                        <Param id="timer_period_value" value="0"/>
                         <Param id="trap_function" value="XMC_CCU4_SLICE_EVENT_NONE"/>
                     </Parameters>
                 </Personality>
@@ -271,6 +271,13 @@
                         <Param id="timer_initial_value" value="0"/>
                         <Param id="timer_period_value" value="4000"/>
                         <Param id="trap_function" value="XMC_CCU4_SLICE_EVENT_NONE"/>
+                    </Parameters>
+                </Personality>
+                <Personality template="xmc_eru-ogu" version="1.0">
+                    <Block location="eru[0].ogu[1]" locked="true"/>
+                    <Parameters>
+                        <Param id="eru_pattern_detection" value="false"/>
+                        <Param id="in_flash" value="true"/>
                     </Parameters>
                 </Personality>
                 <Personality template="xmc_pin" version="1.0">
