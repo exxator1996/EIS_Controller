@@ -155,13 +155,13 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   //Leeren um Fehler zu vermeiden
   XMC_USIC_CH_RXFIFO_Flush(uart_HW);
   // Frequenz wert aus den letzten empfangenen bytes zusammen setzen
-  uint16_t newFrequency = (receivedData[2] << 8) + receivedData[3];
+  uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
 
   // Umwandeln des Empfangenen Wertes um den Tastgrad zu erhalten
-  double_t dutyCycle = receivedData[1] / 1.0;
+  double_t dutyCycle = receivedData[2] / 1.0;
 
   // Anzahl der Perioden
-  uint8_t periodCount = receivedData[0];
+  uint8_t periodCount = receivedData[3];
 
   // Wenn die Frequenz 0 empfangen wird wird die Anregung sofort gestoppt
   // Ansonsten wird geprüft ob über den Tastgrad eine kodierte Anweisung (FF, FE, FD oder FC) zum Moduswechsel
@@ -170,19 +170,19 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   //! Nach einem Moduswechsel sollte mindestens 30 ms gewartet werden, damit die Tracos sich initialisieren können
   if (newFrequency == 0) {
     stopStimulation();
-  } else if (receivedData[1] == 0xFF) {
+  } else if (dutyCycle == 0xFF) {
     stopStimulation();
     mode       = MODE_LR;
     PORT0->OMR = lookupMatrix[mode][state];
-  } else if (receivedData[1] == 0xFE) {
+  } else if (dutyCycle == 0xFE) {
     stopStimulation();
     mode       = MODE_RL;
     PORT0->OMR = lookupMatrix[mode][state];
-  } else if (receivedData[1] == 0xFD) {
+  } else if (dutyCycle == 0xFD) {
     stopStimulation();
     mode       = MODE_BP;
     PORT0->OMR = lookupMatrix[mode][state];
-  } else if (receivedData[1] == 0xFC) {
+  } else if (dutyCycle == 0xFC) {
     stopStimulation();
     mode       = MODE_IDLE;
     PORT0->OMR = lookupMatrix[mode][state];
