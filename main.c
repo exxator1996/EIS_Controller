@@ -53,41 +53,35 @@ output_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT
                                {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
                                {MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT}};
 
-void startFreqTimers(void) {
-  XMC_CCU4_SLICE_StartTimer(timerMSB_HW);
-  XMC_CCU4_SLICE_StartTimer(timerLSB_HW);
-}
+void startFreqTimer(void) { XMC_CCU4_SLICE_StartTimer(timerFreq_HW); }
 
-void stopFreqTimers(void) {
-  XMC_CCU4_SLICE_StopClearTimer(timerMSB_HW);
-  XMC_CCU4_SLICE_StopClearTimer(timerLSB_HW);
-}
+void stopFreqTimer(void) { XMC_CCU4_SLICE_StopClearTimer(timerFreq_HW); }
 
 void setPeriodTime(double_t const period, double_t const dutyCycle) {
-  // timer ticks period = periodeValue in s * 10^9(convert into ns) / 15.625 (time between timer ticks)
-  uint32_t ticksPeriod  = (uint32_t)round((period * pow(10, 9)) / 15.625) - 1;
-  // timer ticks compare output on for duty cycle in %
-  uint32_t ticksCompare = (uint32_t)round(ticksPeriod * dutyCycle / 100.0) - 1;
+  // Prescaler stoppen um ihn einstellen zu können
+  XMC_CCU4_StopPrescaler(ccu4_0_HW);
+  uint32_t ticksPeriod = 0;
+  uint32_t ticksCompare = 0;
 
-  uint16_t periodMsbValue = (uint16_t)(ticksPeriod >> 16);
-  uint16_t periodLsbValue = (uint16_t)(ticksPeriod / (periodMsbValue + 1));
-
-  uint16_t compareMsbValue = (uint16_t)(ticksCompare >> 16);
-  uint16_t compareLsbValue = (uint16_t)(ticksCompare / (compareMsbValue + 1));
-
-  //!Compare Wert darf nicht größer als Period Wert sein -> Neu Berechnung
-  if (periodLsbValue < compareLsbValue) {
-    compareLsbValue = periodLsbValue;
-    compareMsbValue = (uint16_t)(ticksCompare / (compareLsbValue + 1));
+  // Niedrigst möglichen Prescaler Wert ermitteln der eine vollständige Periode laufen kann
+  for (int i = 0; i < 16; i++) {
+    if ((timerTickTimes[i] * 0xFFFF) >= period) {
+      XMC_CCU4_SLICE_SetPrescaler(timerFreq_HW, prescalerValues[i]);
+      // timer ticks period = periodeValue in s / time between timer ticks
+      ticksPeriod  = (uint32_t)round(period / timerTickTimes[i]) - 1;
+      // timer ticks compare output on for duty cycle in %
+      ticksCompare = (uint32_t)round(ticksPeriod * dutyCycle / 100.0);
+      break;
+    }
   }
 
-  XMC_CCU4_SLICE_SetTimerCompareMatch(timerLSB_HW, compareLsbValue);
-  XMC_CCU4_SLICE_SetTimerCompareMatch(timerMSB_HW, compareMsbValue);
+  XMC_CCU4_StartPrescaler(ccu4_0_HW);
 
-  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerLSB_HW, periodLsbValue);
-  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerMSB_HW, periodMsbValue);
+  XMC_CCU4_SLICE_SetTimerCompareMatch(timerFreq_HW, ticksCompare);
+  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerFreq_HW, ticksPeriod);
 
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
+  startFreqTimer();
 }
 
 void setFrequency(double_t const frequency, double_t const dutyCycle) {
@@ -113,7 +107,7 @@ void setPeriodCount(uint8_t const periodCountValue) {
 }
 
 void stopStimulation(void) {
-  stopFreqTimers();
+  stopFreqTimer();
   // Sichereren Zustand herstellen
   PORT0->OMR = lookupMatrix[mode][0];
   state      = 0;
@@ -121,7 +115,7 @@ void stopStimulation(void) {
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
   // Ändern des Zustands in abhängikeit von Betriebsmodus und Zustand
-  XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_COMPARE_MATCH_UP);
+  XMC_CCU4_SLICE_ClearEvent(timerFreq_HW, XMC_CCU4_SLICE_IRQ_ID_COMPARE_MATCH_UP);
 
   PORT0->OMR = lookupMatrix[mode][state];
   // Wenn der letzte Zustand ereicht ist, wird von vorne begonnen, ansonsten wird der Zustand inkrementiert
@@ -130,7 +124,7 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
 
 void ccu4_0_SR1_INTERRUPT_HANDLER() {
   // Ändern des Zustands in abhängikeit von Betriebsmodus und Zustand
-  XMC_CCU4_SLICE_ClearEvent(timerMSB_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
+  XMC_CCU4_SLICE_ClearEvent(timerFreq_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
   PORT0->OMR = lookupMatrix[mode][state];
   // Wenn der letzte Zustand ereicht ist, wird von vorne begonnen, ansonsten wird der Zustand inkrementiert
@@ -152,7 +146,7 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   while (!XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) {
     receivedData[rxIndex++] = XMC_UART_CH_GetReceivedData(uart_HW);
   }
-  //Leeren um Fehler zu vermeiden
+  // Leeren um Fehler zu vermeiden
   XMC_USIC_CH_RXFIFO_Flush(uart_HW);
   // Frequenz wert aus den letzten empfangenen bytes zusammen setzen
   uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
@@ -196,16 +190,12 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
     // Kodierte werte für Frequenzen mit Dezimalstelle
     if (newFrequency == 0xFFFF) {
       setFrequency(0.1, dutyCycle);
-      startFreqTimers();
     } else if (newFrequency == 0xFFFE) {
       setFrequency(0.4, dutyCycle);
-      startFreqTimers();
     } else if (newFrequency == 0xFFFD) {
       setFrequency(0.8, dutyCycle);
-      startFreqTimers();
     } else {
       setFrequency((double_t)newFrequency, dutyCycle);
-      startFreqTimers();
     }
   }
 }
