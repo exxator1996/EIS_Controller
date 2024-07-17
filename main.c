@@ -69,7 +69,7 @@ void startFreqTimer(void) { XMC_CCU4_SLICE_StartTimer(timerFreq_HW); }
 
 void stopFreqTimer(void) { XMC_CCU4_SLICE_StopClearTimer(timerFreq_HW); }
 
-void setPeriodTime(double_t const period, double_t const dutyCycle) {
+void setPeriodTime(double_t const period, uint8_t const dutyCycle) {
   // Prescaler stoppen um ihn einstellen zu können
   XMC_CCU4_StopPrescaler(ccu4_0_HW);
   uint32_t ticksPeriod  = 0;
@@ -96,7 +96,7 @@ void setPeriodTime(double_t const period, double_t const dutyCycle) {
   startFreqTimer();
 }
 
-void setFrequency(double_t const frequency, double_t const dutyCycle) {
+void setFrequency(double_t const frequency, uint8_t const dutyCycle) {
   // Nur Frequenzen zwischen 100 mHz und 10 kHz
   if (frequency >= 0.1 && frequency <= 10000) {
     // Halbieren der Periode um die Frequenz zu verdoppeln weil hier zwei ausgänge angesteuert werden müssen
@@ -125,7 +125,7 @@ void stopStimulation(void) {
   state      = 0;
 }
 
-void modeSwitch(uint8_t modeControlCode) {
+void modeSwitch(uint8_t const modeControlCode) {
   switch (modeControlCode) {
   case 0xFF:
     mode = MODE_LR;
@@ -139,6 +139,24 @@ void modeSwitch(uint8_t modeControlCode) {
   case 0xFC:
   default:
     mode = MODE_IDLE;
+    break;
+  }
+}
+
+void frequencySwitch(uint16_t const frequencyControlCode, uint8_t const dutyCycle) {
+  // Kodierte werte für Frequenzen mit Dezimalstelle
+  switch (frequencyControlCode) {
+  case 0xFFFF:
+    setFrequency(0.1, dutyCycle);
+    break;
+  case 0xFFFE:
+    setFrequency(0.4, dutyCycle);
+    break;
+  case 0xFFFD:
+    setFrequency(0.8, dutyCycle);
+    break;
+  default:
+    setFrequency(frequencyControlCode, dutyCycle);
     break;
   }
 }
@@ -181,8 +199,8 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   // Frequenz wert aus den letzten empfangenen bytes zusammen setzen
   uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
 
-  // Umwandeln des Empfangenen Wertes um den Tastgrad zu erhalten
-  double_t dutyCycle = receivedData[2] / 1.0;
+  // Tastgrad
+  uint8_t dutyCycle = receivedData[2];
 
   // Anzahl der Perioden
   uint8_t periodCount = receivedData[3];
@@ -195,26 +213,18 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   if (newFrequency == 0) {
     stopStimulation();
   } else if (dutyCycle <= 0xFF && dutyCycle >= 0xFC) {
+    //Modus Wechsel
     stopStimulation();
     modeSwitch(dutyCycle);
     PORT0->OMR = lookupMatrix[mode][state];
   } else if (dutyCycle >= 0 && dutyCycle <= 100) {
-
     // Perioden Zähler setzen (0 = Keine begrezung der Periodenzahl)
     if (periodCount != 0) {
       setPeriodCount(periodCount);
     }
 
-    // Kodierte werte für Frequenzen mit Dezimalstelle
-    if (newFrequency == 0xFFFF) {
-      setFrequency(0.1, dutyCycle);
-    } else if (newFrequency == 0xFFFE) {
-      setFrequency(0.4, dutyCycle);
-    } else if (newFrequency == 0xFFFD) {
-      setFrequency(0.8, dutyCycle);
-    } else {
-      setFrequency((double_t)newFrequency, dutyCycle);
-    }
+    //Frequenz einstellen
+    frequencySwitch(newFrequency, dutyCycle);
   }
 }
 
