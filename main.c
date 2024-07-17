@@ -72,7 +72,7 @@ void stopFreqTimer(void) { XMC_CCU4_SLICE_StopClearTimer(timerFreq_HW); }
 void setPeriodTime(double_t const period, double_t const dutyCycle) {
   // Prescaler stoppen um ihn einstellen zu können
   XMC_CCU4_StopPrescaler(ccu4_0_HW);
-  uint32_t ticksPeriod = 0;
+  uint32_t ticksPeriod  = 0;
   uint32_t ticksCompare = 0;
 
   // Niedrigst möglichen Prescaler Wert ermitteln der eine vollständige Periode laufen kann
@@ -123,6 +123,24 @@ void stopStimulation(void) {
   // Sichereren Zustand herstellen
   PORT0->OMR = lookupMatrix[mode][0];
   state      = 0;
+}
+
+void modeSwitch(uint8_t modeControlCode) {
+  switch (modeControlCode) {
+  case 0xFF:
+    mode = MODE_LR;
+    break;
+  case 0xFE:
+    mode = MODE_RL;
+    break;
+  case 0xFD:
+    mode = MODE_BP;
+    break;
+  case 0xFC:
+  default:
+    mode = MODE_IDLE;
+    break;
+  }
 }
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
@@ -176,21 +194,9 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   //! Nach einem Moduswechsel sollte mindestens 30 ms gewartet werden, damit die Tracos sich initialisieren können
   if (newFrequency == 0) {
     stopStimulation();
-  } else if (dutyCycle == 0xFF) {
+  } else if (dutyCycle <= 0xFF && dutyCycle >= 0xFC) {
     stopStimulation();
-    mode       = MODE_LR;
-    PORT0->OMR = lookupMatrix[mode][state];
-  } else if (dutyCycle == 0xFE) {
-    stopStimulation();
-    mode       = MODE_RL;
-    PORT0->OMR = lookupMatrix[mode][state];
-  } else if (dutyCycle == 0xFD) {
-    stopStimulation();
-    mode       = MODE_BP;
-    PORT0->OMR = lookupMatrix[mode][state];
-  } else if (dutyCycle == 0xFC) {
-    stopStimulation();
-    mode       = MODE_IDLE;
+    modeSwitch(dutyCycle);
     PORT0->OMR = lookupMatrix[mode][state];
   } else if (dutyCycle >= 0 && dutyCycle <= 100) {
 
