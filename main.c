@@ -101,7 +101,7 @@ void setFrequency(double_t const frequency, uint8_t const dutyCycle) {
   if (frequency >= 0.1 && frequency <= 10000) {
     // Halbieren der Periode um die Frequenz zu verdoppeln weil hier zwei ausgänge angesteuert werden müssen
     if (mode == MODE_BP)
-      setPeriodTime(1.0 / frequency / 2.0, dutyCycle);
+      setPeriodTime(1.0 / (frequency * 2.0), dutyCycle);
     else
       setPeriodTime(1.0 / frequency, dutyCycle);
   }
