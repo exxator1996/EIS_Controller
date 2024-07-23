@@ -69,10 +69,10 @@ void startFreqTimer(void) { XMC_CCU4_SLICE_StartTimer(timerFreq_HW); }
 
 void stopFreqTimer(void) { XMC_CCU4_SLICE_StopClearTimer(timerFreq_HW); }
 
-void setPeriodTime(double_t const period, double_t const dutyCycle) {
+void setPeriodTime(double_t const period, uint8_t const dutyCycle) {
   // Prescaler stoppen um ihn einstellen zu können
   XMC_CCU4_StopPrescaler(ccu4_0_HW);
-  uint32_t ticksPeriod = 0;
+  uint32_t ticksPeriod  = 0;
   uint32_t ticksCompare = 0;
 
   // Niedrigst möglichen Prescaler Wert ermitteln der eine vollständige Periode laufen kann
@@ -96,12 +96,12 @@ void setPeriodTime(double_t const period, double_t const dutyCycle) {
   startFreqTimer();
 }
 
-void setFrequency(double_t const frequency, double_t const dutyCycle) {
+void setFrequency(double_t const frequency, uint8_t const dutyCycle) {
   // Nur Frequenzen zwischen 100 mHz und 10 kHz
   if (frequency >= 0.1 && frequency <= 10000) {
     // Halbieren der Periode um die Frequenz zu verdoppeln weil hier zwei ausgänge angesteuert werden müssen
     if (mode == MODE_BP)
-      setPeriodTime(1.0 / frequency / 2.0, dutyCycle);
+      setPeriodTime(1.0 / (frequency * 2.0), dutyCycle);
     else
       setPeriodTime(1.0 / frequency, dutyCycle);
   }
@@ -123,6 +123,43 @@ void stopStimulation(void) {
   // Sichereren Zustand herstellen
   PORT0->OMR = lookupMatrix[mode][0];
   state      = 0;
+}
+
+void modeSwitch(uint8_t const modeControlCode) {
+  switch (modeControlCode) {
+  case 0xFF:
+    mode = MODE_LR;
+    break;
+  case 0xFE:
+    mode = MODE_RL;
+    break;
+  case 0xFD:
+    mode = MODE_BP;
+    break;
+  case 0xFC:
+  //Wenn keine gültige eingabe automatisch in sicheren IDLE Zustand
+  default:
+    mode = MODE_IDLE;
+    break;
+  }
+}
+
+void frequencySwitch(uint16_t const frequencyControlCode, uint8_t const dutyCycle) {
+  // Kodierte werte für Frequenzen mit Dezimalstelle
+  switch (frequencyControlCode) {
+  case 0xFFFF:
+    setFrequency(0.1, dutyCycle);
+    break;
+  case 0xFFFE:
+    setFrequency(0.4, dutyCycle);
+    break;
+  case 0xFFFD:
+    setFrequency(0.8, dutyCycle);
+    break;
+  default:
+    setFrequency(frequencyControlCode, dutyCycle);
+    break;
+  }
 }
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
@@ -163,8 +200,8 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   // Frequenz wert aus den letzten empfangenen bytes zusammen setzen
   uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
 
-  // Umwandeln des Empfangenen Wertes um den Tastgrad zu erhalten
-  double_t dutyCycle = receivedData[2] / 1.0;
+  // Tastgrad
+  uint8_t dutyCycle = receivedData[2];
 
   // Anzahl der Perioden
   uint8_t periodCount = receivedData[3];
@@ -176,39 +213,19 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   //! Nach einem Moduswechsel sollte mindestens 30 ms gewartet werden, damit die Tracos sich initialisieren können
   if (newFrequency == 0) {
     stopStimulation();
-  } else if (dutyCycle == 0xFF) {
+  } else if (dutyCycle <= 0xFF && dutyCycle >= 0xFC) {
+    //Modus Wechsel
     stopStimulation();
-    mode       = MODE_LR;
-    PORT0->OMR = lookupMatrix[mode][state];
-  } else if (dutyCycle == 0xFE) {
-    stopStimulation();
-    mode       = MODE_RL;
-    PORT0->OMR = lookupMatrix[mode][state];
-  } else if (dutyCycle == 0xFD) {
-    stopStimulation();
-    mode       = MODE_BP;
-    PORT0->OMR = lookupMatrix[mode][state];
-  } else if (dutyCycle == 0xFC) {
-    stopStimulation();
-    mode       = MODE_IDLE;
+    modeSwitch(dutyCycle);
     PORT0->OMR = lookupMatrix[mode][state];
   } else if (dutyCycle >= 0 && dutyCycle <= 100) {
-
     // Perioden Zähler setzen (0 = Keine begrezung der Periodenzahl)
     if (periodCount != 0) {
       setPeriodCount(periodCount);
     }
 
-    // Kodierte werte für Frequenzen mit Dezimalstelle
-    if (newFrequency == 0xFFFF) {
-      setFrequency(0.1, dutyCycle);
-    } else if (newFrequency == 0xFFFE) {
-      setFrequency(0.4, dutyCycle);
-    } else if (newFrequency == 0xFFFD) {
-      setFrequency(0.8, dutyCycle);
-    } else {
-      setFrequency((double_t)newFrequency, dutyCycle);
-    }
+    //Frequenz einstellen
+    frequencySwitch(newFrequency, dutyCycle);
   }
 }
 
@@ -232,6 +249,7 @@ int main(void) {
   if (XMC_SCU_RESET_REASON_WATCHDOG & XMC_SCU_RESET_GetDeviceResetReason()) {
     PORT0->OMR = MODE_IDLE_OUT;
     XMC_SCU_RESET_ClearDeviceResetReason();
+    //Dauerschleife bis zum neuen Reset 
     while (true)
       ;
   }
