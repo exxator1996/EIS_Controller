@@ -137,7 +137,7 @@ void modeSwitch(uint8_t const modeControlCode) {
     mode = MODE_BP;
     break;
   case 0xFC:
-  //Wenn keine gültige eingabe automatisch in sicheren IDLE Zustand
+  // Wenn keine gültige eingabe automatisch in sicheren IDLE Zustand
   default:
     mode = MODE_IDLE;
     break;
@@ -191,12 +191,20 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
 
   uint8_t receivedData[4];
   uint8_t rxIndex = 0;
-  // Lesen der Daten bis der Input Puffer leer ist
-  while (!XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) {
+
+  // Wenn keine Steurungs Daten Interrupt Handler verlassen um Fehler zu vermeiden
+  if (XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) {
+    return;
+  }
+  // Lesen der Daten bis der Input Puffer leer ist oder 4 Bytes Empfangen wurden
+  while ((!XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) && rxIndex < 4) {
     receivedData[rxIndex++] = XMC_UART_CH_GetReceivedData(uart_HW);
   }
-  // Leeren um Fehler zu vermeiden
-  XMC_USIC_CH_RXFIFO_Flush(uart_HW);
+  // Wenn RXFIFO nicht leer weil zu viele Daten -> Leeren
+  if (!XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) {
+    XMC_USIC_CH_RXFIFO_Flush(uart_HW);
+  }
+
   // Frequenz wert aus den letzten empfangenen bytes zusammen setzen
   uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
 
@@ -206,6 +214,11 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   // Anzahl der Perioden
   uint8_t periodCount = receivedData[3];
 
+  // Alles Null == Master Reset
+  if (newFrequency == 0 && dutyCycle == 0 && periodCount == 0) {
+    XMC_SCU_RESET_AssertMasterReset();
+  }
+
   // Wenn die Frequenz 0 empfangen wird wird die Anregung sofort gestoppt
   // Ansonsten wird geprüft ob über den Tastgrad eine kodierte Anweisung (FF, FE, FD oder FC) zum Moduswechsel
   // übertragen wird Wenn ein Modus wechsel durchgeführt wird zunächst die Anregung gestoppt und dann der Startzustand
@@ -214,7 +227,7 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   if (newFrequency == 0) {
     stopStimulation();
   } else if (dutyCycle <= 0xFF && dutyCycle >= 0xFC) {
-    //Modus Wechsel
+    // Modus Wechsel
     stopStimulation();
     modeSwitch(dutyCycle);
     PORT0->OMR = lookupMatrix[mode][state];
@@ -224,7 +237,7 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
       setPeriodCount(periodCount);
     }
 
-    //Frequenz einstellen
+    // Frequenz einstellen
     frequencySwitch(newFrequency, dutyCycle);
   }
 }
@@ -249,7 +262,7 @@ int main(void) {
   if (XMC_SCU_RESET_REASON_WATCHDOG & XMC_SCU_RESET_GetDeviceResetReason()) {
     PORT0->OMR = MODE_IDLE_OUT;
     XMC_SCU_RESET_ClearDeviceResetReason();
-    //Dauerschleife bis zum neuen Reset 
+    // Dauerschleife bis zum neuen Reset
     while (true)
       ;
   }
@@ -258,6 +271,9 @@ int main(void) {
   mode       = MODE_IDLE;
   // Start Ausgabe
   PORT0->OMR = MODE_IDLE_OUT;
+
+  // Sicherstellen das der RXFIFO leer ist
+  XMC_USIC_CH_RXFIFO_Flush(uart_HW);
 
   NVIC_SetPriority(ccu4_0_SR0_IRQN, 0U);
   NVIC_EnableIRQ(ccu4_0_SR0_IRQN);
