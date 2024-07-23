@@ -137,6 +137,7 @@ void modeSwitch(uint8_t const modeControlCode) {
     mode = MODE_BP;
     break;
   case 0xFC:
+  //Wenn keine gültige eingabe automatisch in sicheren IDLE Zustand
   default:
     mode = MODE_IDLE;
     break;
@@ -248,6 +249,7 @@ int main(void) {
   if (XMC_SCU_RESET_REASON_WATCHDOG & XMC_SCU_RESET_GetDeviceResetReason()) {
     PORT0->OMR = MODE_IDLE_OUT;
     XMC_SCU_RESET_ClearDeviceResetReason();
+    //Dauerschleife bis zum neuen Reset 
     while (true)
       ;
   }
