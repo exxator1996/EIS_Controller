@@ -82,7 +82,7 @@ void setPeriodTime(double_t const period, uint8_t const dutyCycle) {
       // timer ticks period = periodeValue in s / time between timer ticks
       ticksPeriod  = (uint32_t)round(period / timerTickTimes[i]) - 1;
       // timer ticks compare output on for duty cycle in %
-      ticksCompare = (uint32_t)round(ticksPeriod * dutyCycle / 100.0);
+      ticksCompare = (uint32_t)round(ticksPeriod * ((100 - dutyCycle) / 100.0));
       break;
     }
   }
@@ -110,9 +110,9 @@ void setFrequency(double_t const frequency, uint8_t const dutyCycle) {
 void setPeriodCount(uint8_t const periodCountValue) {
   XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
   if (mode == MODE_RL || mode == MODE_LR) {
-    XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (2 * periodCountValue + 1));
+    XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (2 * periodCountValue));
   } else if (mode == MODE_BP) {
-    XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (4 * periodCountValue + 1));
+    XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (4 * periodCountValue));
   }
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, XMC_CCU4_SHADOW_TRANSFER_SLICE_2);
   XMC_CCU4_SLICE_StartTimer(timerPeriodCount_HW);
@@ -166,18 +166,20 @@ void ccu4_0_SR0_INTERRUPT_HANDLER() {
   // Ändern des Zustands in abhängikeit von Betriebsmodus und Zustand
   XMC_CCU4_SLICE_ClearEvent(timerFreq_HW, XMC_CCU4_SLICE_IRQ_ID_COMPARE_MATCH_UP);
 
-  PORT0->OMR = lookupMatrix[mode][state];
   // Wenn der letzte Zustand ereicht ist, wird von vorne begonnen, ansonsten wird der Zustand inkrementiert
   state      = (state == 3) ? 0 : state + 1;
+  // MC Ausgang beschreiben
+  PORT0->OMR = lookupMatrix[mode][state];
 }
 
 void ccu4_0_SR1_INTERRUPT_HANDLER() {
   // Ändern des Zustands in abhängikeit von Betriebsmodus und Zustand
   XMC_CCU4_SLICE_ClearEvent(timerFreq_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
 
-  PORT0->OMR = lookupMatrix[mode][state];
   // Wenn der letzte Zustand ereicht ist, wird von vorne begonnen, ansonsten wird der Zustand inkrementiert
   state      = (state == 3) ? 0 : state + 1;
+  // MC Ausgang beschreiben
+  PORT0->OMR = lookupMatrix[mode][state];
 }
 
 void ccu4_0_SR2_INTERRUPT_HANDLER() {
@@ -210,7 +212,6 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
     XMC_UART_CH_Transmit(uart_HW, receivedData[i]);
   }
 
-  
   // Frequenz wert aus den letzten empfangenen bytes zusammen setzen
   uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
 
@@ -293,7 +294,7 @@ int main(void) {
   NVIC_SetPriority(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN, 2U);
   NVIC_EnableIRQ(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN);
 
-  //Senden das MC bereit
+  // Senden das MC bereit
   XMC_UART_CH_Transmit(uart_HW, '\n');
 
   for (;;) {
