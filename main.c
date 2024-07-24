@@ -205,6 +205,12 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
     XMC_USIC_CH_RXFIFO_Flush(uart_HW);
   }
 
+  // Empfangen Daten zurückschreiben
+  for (int i = 0; i < rxIndex; i++) {
+    XMC_UART_CH_Transmit(uart_HW, receivedData[i]);
+  }
+
+  
   // Frequenz wert aus den letzten empfangenen bytes zusammen setzen
   uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
 
@@ -286,6 +292,9 @@ int main(void) {
 
   NVIC_SetPriority(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN, 2U);
   NVIC_EnableIRQ(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN);
+
+  //Senden das MC bereit
+  XMC_UART_CH_Transmit(uart_HW, '\n');
 
   for (;;) {
     XMC_WDT_Service();
