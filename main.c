@@ -99,7 +99,7 @@ void setPeriodTime(double_t const period, uint8_t const dutyCycle) {
 void setFrequency(double_t const frequency, uint8_t const dutyCycle) {
   // Nur Frequenzen zwischen 100 mHz und 10 kHz
   if (frequency >= 0.1 && frequency <= 10000) {
-    // Halbieren der Periode um die Frequenz zu verdoppeln weil hier zwei ausgänge angesteuert werden müssen
+    // Frequenz verdoppeln weil hier vier statt zwei Zustandswechsel stattfinden müssen
     if (mode == MODE_BP)
       setPeriodTime(1.0 / (frequency * 2.0), dutyCycle);
     else
