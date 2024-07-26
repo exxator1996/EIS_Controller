@@ -221,17 +221,15 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   // Anzahl der Perioden
   uint8_t periodCount = receivedData[3];
 
-  // Alles Null == Master Reset
-  if (newFrequency == 0 && dutyCycle == 0 && periodCount == 0) {
-    XMC_SCU_RESET_AssertMasterReset();
-  }
-
   // Wenn die Frequenz 0 empfangen wird wird die Anregung sofort gestoppt
   // Ansonsten wird geprüft ob über den Tastgrad eine kodierte Anweisung (FF, FE, FD oder FC) zum Moduswechsel
   // übertragen wird Wenn ein Modus wechsel durchgeführt wird zunächst die Anregung gestoppt und dann der Startzustand
   // des Modus auf den Port ausgegeben
   //! Nach einem Moduswechsel sollte mindestens 30 ms gewartet werden, damit die Tracos sich initialisieren können
-  if (newFrequency == 0) {
+  // Alles Null == Master Reset
+  if (newFrequency == 0 && dutyCycle == 0 && periodCount == 0) {
+    XMC_SCU_RESET_AssertMasterReset();
+  } else if (newFrequency == 0) {
     stopStimulation();
   } else if (dutyCycle <= 0xFF && dutyCycle >= 0xFC) {
     // Modus Wechsel
