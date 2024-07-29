@@ -33,134 +33,22 @@
 #include "cy_utils.h"
 #include "cybsp.h"
 #include "cycfg_peripherals.h"
-#include "modes_states_pins.h"
-#include "xmc1_scu.h"
-#include "xmc_ccu4.h"
 #include "xmc_scu.h"
 #include "xmc_uart.h"
 #include "xmc_usic.h"
 #include "xmc_wdt.h"
-#include <math.h>
+#include "uart_control.h"
 #include <stdint.h>
 
-// Prescaler Value
-double_t timerTickTimes[] = {1.5625E-8, 3.125e-8, 6.25e-8, 1.25e-7, 2.5e-7, 5e-7,    1e-6,    2e-6,
-                             4e-6,      8e-6,     1.6e-5,  3.2e-5,  6.4e-5, 1.28e-4, 2.56e-4, 5.12e-4};
 
-XMC_CCU4_SLICE_PRESCALER_t prescalerValues[] = {
-    XMC_CCU4_SLICE_PRESCALER_1,    XMC_CCU4_SLICE_PRESCALER_2,    XMC_CCU4_SLICE_PRESCALER_4,
-    XMC_CCU4_SLICE_PRESCALER_8,    XMC_CCU4_SLICE_PRESCALER_16,   XMC_CCU4_SLICE_PRESCALER_32,
-    XMC_CCU4_SLICE_PRESCALER_64,   XMC_CCU4_SLICE_PRESCALER_128,  XMC_CCU4_SLICE_PRESCALER_256,
-    XMC_CCU4_SLICE_PRESCALER_512,  XMC_CCU4_SLICE_PRESCALER_1024, XMC_CCU4_SLICE_PRESCALER_2048,
-    XMC_CCU4_SLICE_PRESCALER_4096, XMC_CCU4_SLICE_PRESCALER_8192, XMC_CCU4_SLICE_PRESCALER_16384,
-    XMC_CCU4_SLICE_PRESCALER_32768};
-
-// Betriebsmodus Variable
-mode_t mode                 = MODE_IDLE;
-// Zustands variable
-uint16_t state              = 0;
-// Zeile 1 = RL / Zeile 2 = LR / Zeile 3 = BP / Zeile 4 = IDLE
 output_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT, MODE_RL_ON_OUT},
                                {MODE_LR_OFF_OUT, MODE_LR_ON_OUT, MODE_LR_OFF_OUT, MODE_LR_ON_OUT},
                                {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
                                {MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT}};
-
-void startFreqTimer(void) { XMC_CCU4_SLICE_StartTimer(timerFreq_HW); }
-
-void stopFreqTimer(void) { XMC_CCU4_SLICE_StopClearTimer(timerFreq_HW); }
-
-void setPeriodTime(double_t const period, uint8_t const dutyCycle) {
-  // Prescaler stoppen um ihn einstellen zu können
-  XMC_CCU4_StopPrescaler(ccu4_0_HW);
-  uint32_t ticksPeriod  = 0;
-  uint32_t ticksCompare = 0;
-
-  // Niedrigst möglichen Prescaler Wert ermitteln der eine vollständige Periode laufen kann
-  for (int i = 0; i < 16; i++) {
-    if ((timerTickTimes[i] * 0xFFFF) >= period) {
-      XMC_CCU4_SLICE_SetPrescaler(timerFreq_HW, prescalerValues[i]);
-      // timer ticks period = periodeValue in s / time between timer ticks
-      ticksPeriod  = (uint32_t)round(period / timerTickTimes[i]) - 1;
-      // timer ticks compare output on for duty cycle in %
-      ticksCompare = (uint32_t)round(ticksPeriod * ((100 - dutyCycle) / 100.0));
-      break;
-    }
-  }
-
-  XMC_CCU4_StartPrescaler(ccu4_0_HW);
-
-  XMC_CCU4_SLICE_SetTimerCompareMatch(timerFreq_HW, ticksCompare);
-  XMC_CCU4_SLICE_SetTimerPeriodMatch(timerFreq_HW, ticksPeriod);
-
-  XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
-  startFreqTimer();
-}
-
-void setFrequency(double_t const frequency, uint8_t const dutyCycle) {
-  // Nur Frequenzen zwischen 100 mHz und 10 kHz
-  if (frequency >= 0.1 && frequency <= 10000) {
-    // Frequenz verdoppeln weil hier vier statt zwei Zustandswechsel stattfinden müssen
-    if (mode == MODE_BP)
-      setPeriodTime(1.0 / (frequency * 2.0), dutyCycle);
-    else
-      setPeriodTime(1.0 / frequency, dutyCycle);
-  }
-}
-
-void setPeriodCount(uint8_t const periodCountValue) {
-  XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
-  if (mode == MODE_RL || mode == MODE_LR) {
-    XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (2 * periodCountValue));
-  } else if (mode == MODE_BP) {
-    XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (4 * periodCountValue));
-  }
-  XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, XMC_CCU4_SHADOW_TRANSFER_SLICE_2);
-  XMC_CCU4_SLICE_StartTimer(timerPeriodCount_HW);
-}
-
-void stopStimulation(void) {
-  stopFreqTimer();
-  // Sichereren Zustand herstellen
-  PORT0->OMR = lookupMatrix[mode][0];
-  state      = 0;
-}
-
-void modeSwitch(uint8_t const modeControlCode) {
-  switch (modeControlCode) {
-  case 0xFF:
-    mode = MODE_LR;
-    break;
-  case 0xFE:
-    mode = MODE_RL;
-    break;
-  case 0xFD:
-    mode = MODE_BP;
-    break;
-  case 0xFC:
-  // Wenn keine gültige eingabe automatisch in sicheren IDLE Zustand
-  default:
-    mode = MODE_IDLE;
-    break;
-  }
-}
-
-void frequencySwitch(uint16_t const frequencyControlCode, uint8_t const dutyCycle) {
-  // Kodierte werte für Frequenzen mit Dezimalstelle
-  switch (frequencyControlCode) {
-  case 0xFFFF:
-    setFrequency(0.1, dutyCycle);
-    break;
-  case 0xFFFE:
-    setFrequency(0.4, dutyCycle);
-    break;
-  case 0xFFFD:
-    setFrequency(0.8, dutyCycle);
-    break;
-  default:
-    setFrequency(frequencyControlCode, dutyCycle);
-    break;
-  }
-}
+// Betriebsmodus Variable
+mode_t mode                 = MODE_IDLE;
+// Zustands variable
+uint16_t state              = 0;
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
   // Ändern des Zustands in abhängikeit von Betriebsmodus und Zustand
@@ -185,7 +73,7 @@ void ccu4_0_SR1_INTERRUPT_HANDLER() {
 void ccu4_0_SR2_INTERRUPT_HANDLER() {
   // Interupt handler nachdem periodCountValue ereicht ist (Wird für jeden compare und period Match erhöht)
   XMC_CCU4_SLICE_ClearEvent(timerPeriodCount_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
-  stopStimulation();
+  stopStimulation(&mode,&state);
 }
 
 void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
@@ -221,30 +109,8 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   // Anzahl der Perioden
   uint8_t periodCount = receivedData[3];
 
-  // Wenn die Frequenz 0 empfangen wird wird die Anregung sofort gestoppt
-  // Ansonsten wird geprüft ob über den Tastgrad eine kodierte Anweisung (FF, FE, FD oder FC) zum Moduswechsel
-  // übertragen wird Wenn ein Modus wechsel durchgeführt wird zunächst die Anregung gestoppt und dann der Startzustand
-  // des Modus auf den Port ausgegeben
-  //! Nach einem Moduswechsel sollte mindestens 30 ms gewartet werden, damit die Tracos sich initialisieren können
-  // Alles Null == Master Reset
-  if (newFrequency == 0 && dutyCycle == 0 && periodCount == 0) {
-    XMC_SCU_RESET_AssertMasterReset();
-  } else if (newFrequency == 0) {
-    stopStimulation();
-  } else if (dutyCycle <= 0xFF && dutyCycle >= 0xFC) {
-    // Modus Wechsel
-    stopStimulation();
-    modeSwitch(dutyCycle);
-    PORT0->OMR = lookupMatrix[mode][state];
-  } else if (dutyCycle >= 0 && dutyCycle <= 100) {
-    // Perioden Zähler setzen (0 = Keine begrezung der Periodenzahl)
-    if (periodCount != 0) {
-      setPeriodCount(periodCount);
-    }
-
-    // Frequenz einstellen
-    frequencySwitch(newFrequency, dutyCycle);
-  }
+  //Ausertung der Empgangen Daten
+  uartCommandEvaluation(&newFrequency, &dutyCycle, &periodCount, &mode, &state);
 }
 
 void HardFault_Handler() {
