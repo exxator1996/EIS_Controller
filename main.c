@@ -265,11 +265,13 @@ int main(void) {
 
   // Wenn der letzte Reset vom Watchdog Timer verursacht wurde sicheren Zustand herstellen
   if (XMC_SCU_RESET_REASON_WATCHDOG & XMC_SCU_RESET_GetDeviceResetReason()) {
+    mode       = MODE_IDLE;
     PORT0->OMR = MODE_IDLE_OUT;
     XMC_SCU_RESET_ClearDeviceResetReason();
     // Dauerschleife bis zum neuen Reset
-    while (true)
-      ;
+    while (true) {
+      XMC_WDT_Service();
+    }
   }
 
   // Start Betriebsmodus
