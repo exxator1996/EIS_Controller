@@ -1,9 +1,9 @@
 #ifndef TIMER_H
 #define TIMER_H
 
-#include "math.h"
 #include "modes_states_pins.h"
 #include <XMC1100.h>
+#include <math.h>
 
 
 void startFreqTimer(void);

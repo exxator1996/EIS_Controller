@@ -29,26 +29,22 @@
  *
  *****************************************************************************/
 
-#include "XMC1100.h"
 #include "cy_utils.h"
 #include "cybsp.h"
 #include "cycfg_peripherals.h"
-#include "xmc_scu.h"
-#include "xmc_uart.h"
-#include "xmc_usic.h"
-#include "xmc_wdt.h"
 #include "uart_control.h"
+#include "modes_states_pins.h"
+#include <XMC1100.h>
 #include <stdint.h>
+#include <xmc_scu.h>
+#include <xmc_uart.h>
+#include <xmc_usic.h>
+#include <xmc_wdt.h>
 
-
-output_t lookupMatrix[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT, MODE_RL_ON_OUT},
-                               {MODE_LR_OFF_OUT, MODE_LR_ON_OUT, MODE_LR_OFF_OUT, MODE_LR_ON_OUT},
-                               {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
-                               {MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT}};
 // Betriebsmodus Variable
-mode_t mode                 = MODE_IDLE;
+mode_t mode    = MODE_IDLE;
 // Zustands variable
-uint16_t state              = 0;
+uint16_t state = 0;
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
   // Ändern des Zustands in abhängikeit von Betriebsmodus und Zustand
@@ -73,7 +69,7 @@ void ccu4_0_SR1_INTERRUPT_HANDLER() {
 void ccu4_0_SR2_INTERRUPT_HANDLER() {
   // Interupt handler nachdem periodCountValue ereicht ist (Wird für jeden compare und period Match erhöht)
   XMC_CCU4_SLICE_ClearEvent(timerPeriodCount_HW, XMC_CCU4_SLICE_IRQ_ID_PERIOD_MATCH);
-  stopStimulation(&mode,&state);
+  stopStimulation(&mode, &state);
 }
 
 void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
@@ -96,10 +92,11 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   }
 
   // Empfangen Daten zurückschreiben
+  XMC_UART_CH_Transmit(uart_HW, '\n');
   for (int i = 0; i < rxIndex; i++) {
     XMC_UART_CH_Transmit(uart_HW, receivedData[i]);
   }
-
+  XMC_UART_CH_Transmit(uart_HW, '\n');
   // Frequenz wert aus den letzten empfangenen bytes zusammen setzen
   uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
 
@@ -109,7 +106,7 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   // Anzahl der Perioden
   uint8_t periodCount = receivedData[3];
 
-  //Ausertung der Empgangen Daten
+  // Auswertung der Empgangen Daten
   uartCommandEvaluation(&newFrequency, &dutyCycle, &periodCount, &mode, &state);
 }
 
@@ -137,6 +134,7 @@ int main(void) {
     // Dauerschleife bis zum neuen Reset
     while (true) {
       XMC_WDT_Service();
+      XMC_UART_CH_Transmit(uart_HW, 'x');
     }
   }
 
@@ -161,7 +159,7 @@ int main(void) {
   NVIC_EnableIRQ(uart_RECEIVE_BUFFER_STANDARD_EVENT_IRQN);
 
   // Senden das MC bereit
-  XMC_UART_CH_Transmit(uart_HW, '\n');
+  XMC_UART_CH_Transmit(uart_HW, 0x40);
 
   for (;;) {
     XMC_WDT_Service();

@@ -1,18 +1,18 @@
 #include "uart_control.h"
+#include "cycfg_peripherals.h"
 #include "modes_states_pins.h"
 #include "timer.h"
-#include "xmc_scu.h"
+#include "xmc_uart.h"
+#include <xmc_scu.h>
+#include <XMC1100.h>
+#include <stdint.h>
 
-output_t lookupMatrixUart[4][4] = {{MODE_RL_OFF_OUT, MODE_RL_ON_OUT, MODE_RL_OFF_OUT, MODE_RL_ON_OUT},
-                               {MODE_LR_OFF_OUT, MODE_LR_ON_OUT, MODE_LR_OFF_OUT, MODE_LR_ON_OUT},
-                               {MODE_BP_OFF_OUT, MODE_BP_RL_ON_OUT, MODE_BP_OFF_OUT, MODE_BP_LR_ON_OUT},
-                               {MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT, MODE_IDLE_OUT}};
 
 
 void stopStimulation(const mode_t *const mode, uint16_t *const state) {
   stopFreqTimer();
   // Sichereren Zustand herstellen
-  PORT0->OMR = lookupMatrixUart[*mode][0];
+  PORT0->OMR = lookupMatrix[*mode][0];
   *state     = 0;
 }
 
@@ -62,7 +62,7 @@ void uartCommandEvaluation(const uint16_t *const frequency, const uint8_t *const
   // des Modus auf den Port ausgegeben
   //! Nach einem Moduswechsel sollte mindestens 30 ms gewartet werden, damit die Tracos sich initialisieren können
   // Alles Null == Master Reset
-  if (*frequency == 0 && dutyCycle == 0 && periodCount == 0) {
+  if (*frequency == 0 && *dutyCycle == 0 && *periodCount == 0) {
     XMC_SCU_RESET_AssertMasterReset();
   } else if (*frequency == 0) {
     stopStimulation(mode, state);
@@ -70,7 +70,7 @@ void uartCommandEvaluation(const uint16_t *const frequency, const uint8_t *const
     // Modus Wechsel
     stopStimulation(mode, state);
     modeSwitch(dutyCycle, mode);
-    PORT0->OMR = lookupMatrixUart[*mode][*state];
+    PORT0->OMR = lookupMatrix[*mode][*state];
   } else if (*dutyCycle >= 0 && *dutyCycle <= 100) {
     // Perioden Zähler setzen (0 = Keine begrezung der Periodenzahl)
     if (*periodCount != 0) {

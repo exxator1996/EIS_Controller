@@ -43,4 +43,6 @@ typedef enum {
   MODE_BP_LR_ON_OUT = (PIN_PRI_1_ON | PIN_SEK_1_ON | PIN_CRTL_1_ON | PIN_PRI_2_ON | PIN_SEK_2_OFF | PIN_CRTL_2_ON)
 } output_t;
 
+const extern output_t lookupMatrix[4][4];
+
 #endif
