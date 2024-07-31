@@ -115,11 +115,6 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   uartCommandEvaluation(&newFrequency, &dutyCycle, &periodCount, &mode, &state);
 }
 
-void HardFault_Handler() {
-  PORT0->OMR = MODE_IDLE_OUT;
-  while (true) {
-  }
-}
 
 int main(void) {
   cy_rslt_t result;
