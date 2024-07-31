@@ -6,10 +6,6 @@
 #include <math.h>
 
 
-void startFreqTimer(void);
-
-void stopFreqTimer(void);
-
 void setPeriodTime(const double_t period, const uint8_t* const dutyCycle);
 
 void setFrequency(const double_t frequency, const uint8_t* const dutyCycle, const mode_t* const mode);

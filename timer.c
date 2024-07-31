@@ -16,10 +16,6 @@ XMC_CCU4_SLICE_PRESCALER_t prescalerValues[] = {
     XMC_CCU4_SLICE_PRESCALER_4096, XMC_CCU4_SLICE_PRESCALER_8192, XMC_CCU4_SLICE_PRESCALER_16384,
     XMC_CCU4_SLICE_PRESCALER_32768};
 
-void startFreqTimer(void) { XMC_CCU4_SLICE_StartTimer(timerFreq_HW); }
-
-void stopFreqTimer(void) { XMC_CCU4_SLICE_StopClearTimer(timerFreq_HW); }
-
 void setPeriodTime(double_t const period, const uint8_t* const dutyCycle) {
   // Prescaler stoppen um ihn einstellen zu können
   XMC_CCU4_StopPrescaler(ccu4_0_HW);
@@ -44,7 +40,7 @@ void setPeriodTime(double_t const period, const uint8_t* const dutyCycle) {
   XMC_CCU4_SLICE_SetTimerPeriodMatch(timerFreq_HW, ticksPeriod);
 
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, (XMC_CCU4_SHADOW_TRANSFER_SLICE_0 | XMC_CCU4_SHADOW_TRANSFER_SLICE_1));
-  startFreqTimer();
+  XMC_CCU4_SLICE_StartTimer(timerFreq_HW);
 }
 
 void setFrequency(const double_t frequency, const uint8_t* const dutyCycle, const mode_t* const mode) {

@@ -2,15 +2,13 @@
 #include "cycfg_peripherals.h"
 #include "modes_states_pins.h"
 #include "timer.h"
-#include "xmc_uart.h"
-#include <xmc_scu.h>
+#include "xmc_ccu4.h"
 #include <XMC1100.h>
 #include <stdint.h>
-
-
+#include <xmc_scu.h>
 
 void stopStimulation(const mode_t *const mode, uint16_t *const state) {
-  stopFreqTimer();
+  XMC_CCU4_SLICE_StopClearTimer(timerFreq_HW);
   // Sichereren Zustand herstellen
   PORT0->OMR = lookupMatrix[*mode][0];
   *state     = 0;
