@@ -5,10 +5,10 @@
 #include <math.h>
 #include <XMC1100.h>
 // Prescaler Value
-double_t timerTickTimes[] = {1.5625E-8, 3.125e-8, 6.25e-8, 1.25e-7, 2.5e-7, 5e-7,    1e-6,    2e-6,
+static double_t timerTickTimes[] = {1.5625E-8, 3.125e-8, 6.25e-8, 1.25e-7, 2.5e-7, 5e-7,    1e-6,    2e-6,
                              4e-6,      8e-6,     1.6e-5,  3.2e-5,  6.4e-5, 1.28e-4, 2.56e-4, 5.12e-4};
 
-XMC_CCU4_SLICE_PRESCALER_t prescalerValues[] = {
+static XMC_CCU4_SLICE_PRESCALER_t prescalerValues[] = {
     XMC_CCU4_SLICE_PRESCALER_1,    XMC_CCU4_SLICE_PRESCALER_2,    XMC_CCU4_SLICE_PRESCALER_4,
     XMC_CCU4_SLICE_PRESCALER_8,    XMC_CCU4_SLICE_PRESCALER_16,   XMC_CCU4_SLICE_PRESCALER_32,
     XMC_CCU4_SLICE_PRESCALER_64,   XMC_CCU4_SLICE_PRESCALER_128,  XMC_CCU4_SLICE_PRESCALER_256,
