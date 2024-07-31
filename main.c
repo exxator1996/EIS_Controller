@@ -32,8 +32,8 @@
 #include "cy_utils.h"
 #include "cybsp.h"
 #include "cycfg_peripherals.h"
-#include "uart_control.h"
 #include "modes_states_pins.h"
+#include "uart_control.h"
 #include <XMC1100.h>
 #include <stdint.h>
 #include <xmc_scu.h>
@@ -41,10 +41,11 @@
 #include <xmc_usic.h>
 #include <xmc_wdt.h>
 
+
 // Betriebsmodus Variable
-mode_t mode    = MODE_IDLE;
+static mode_t mode = MODE_IDLE;
 // Zustands variable
-uint16_t state = 0;
+static uint16_t state     = 0;
 
 void ccu4_0_SR0_INTERRUPT_HANDLER() {
   // Ändern des Zustands in abhängikeit von Betriebsmodus und Zustand

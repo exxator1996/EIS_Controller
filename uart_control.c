@@ -31,7 +31,7 @@ void modeSwitch(const uint8_t *const modeControlCode, mode_t *const mode, uint16
     *mode = MODE_IDLE;
     break;
   }
-  //Ausgang in abhängikeit von neuem Zustand setzen
+  // Ausgang in abhängikeit von neuem Zustand setzen
   PORT0->OMR = lookupMatrix[*mode][*state];
 }
 
