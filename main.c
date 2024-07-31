@@ -84,7 +84,7 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
     return;
   }
 
-  // Lesen der Daten bis der Input Puffer leer ist oder 4 Bytes Empfangen wurden
+  // Lesen der Daten bis der Input Puffer leer ist und maximal 4 Bytes Empfangen wurden
   while ((!XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) && rxIndex < 4) {
     receivedData[rxIndex++] = XMC_UART_CH_GetReceivedData(uart_HW);
   }
