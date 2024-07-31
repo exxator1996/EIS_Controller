@@ -14,7 +14,7 @@ void stopStimulation(const mode_t *const mode, uint16_t *const state) {
   *state     = 0;
 }
 
-void modeSwitch(const uint8_t *const modeControlCode, mode_t *const mode) {
+void modeSwitch(const uint8_t *const modeControlCode, mode_t *const mode, uint16_t *const state) {
   switch (*modeControlCode) {
   case 0xFF:
     *mode = MODE_LR;
@@ -31,6 +31,8 @@ void modeSwitch(const uint8_t *const modeControlCode, mode_t *const mode) {
     *mode = MODE_IDLE;
     break;
   }
+  //Ausgang in abhängikeit von neuem Zustand setzen
+  PORT0->OMR = lookupMatrix[*mode][*state];
 }
 
 void frequencySwitch(const uint16_t *const frequencyControlCode, const uint8_t *const dutyCycle,
@@ -67,8 +69,7 @@ void uartCommandEvaluation(const uint16_t *const frequency, const uint8_t *const
   } else if (*dutyCycle <= 0xFF && *dutyCycle >= 0xFC) {
     // Modus Wechsel
     stopStimulation(mode, state);
-    modeSwitch(dutyCycle, mode);
-    PORT0->OMR = lookupMatrix[*mode][*state];
+    modeSwitch(dutyCycle, mode, state);
   } else if (*dutyCycle >= 0 && *dutyCycle <= 100) {
     // Perioden Zähler setzen (0 = Keine begrezung der Periodenzahl)
     if (*periodCount != 0) {

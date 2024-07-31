@@ -7,7 +7,7 @@
 
 void stopStimulation(const mode_t *const mode, uint16_t *const state);
 
-void modeSwitch(const uint8_t *const modeControlCode, mode_t *const mode);
+void modeSwitch(const uint8_t *const modeControlCode, mode_t *const mode, uint16_t *const state);
 
 void frequencySwitch(const uint16_t *const frequencyControlCode, const uint8_t *const dutyCycle,
                      const mode_t *const mode);
