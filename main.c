@@ -83,27 +83,31 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   if (XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) {
     return;
   }
+
   // Lesen der Daten bis der Input Puffer leer ist oder 4 Bytes Empfangen wurden
   while ((!XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) && rxIndex < 4) {
     receivedData[rxIndex++] = XMC_UART_CH_GetReceivedData(uart_HW);
   }
+
   // Wenn RXFIFO nicht leer weil zu viele Daten -> Leeren
   if (!XMC_USIC_CH_RXFIFO_IsEmpty(uart_HW)) {
     XMC_USIC_CH_RXFIFO_Flush(uart_HW);
   }
 
   // Empfangen Daten zurückschreiben
+  // Signal Start
   XMC_UART_CH_Transmit(uart_HW, '\n');
+
   for (int i = 0; i < rxIndex; i++) {
     XMC_UART_CH_Transmit(uart_HW, receivedData[i]);
   }
+  
+  //Signal Stopp
   XMC_UART_CH_Transmit(uart_HW, '\n');
+
   // Frequenz wert aus den letzten empfangenen bytes zusammen setzen
   uint16_t newFrequency = (receivedData[0] << 8) + receivedData[1];
-
-  // Tastgrad
   uint8_t dutyCycle = receivedData[2];
-
   // Anzahl der Perioden
   uint8_t periodCount = receivedData[3];
 
