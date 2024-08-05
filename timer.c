@@ -16,7 +16,7 @@ static const XMC_CCU4_SLICE_PRESCALER_t prescalerValues[] = {
     XMC_CCU4_SLICE_PRESCALER_4096, XMC_CCU4_SLICE_PRESCALER_8192, XMC_CCU4_SLICE_PRESCALER_16384,
     XMC_CCU4_SLICE_PRESCALER_32768};
 
-void setPeriodTime(double_t const period, const uint8_t* const dutyCycle) {
+void setPeriodTime(double_t const period, const uint8_t dutyCycle) {
   // Prescaler stoppen um ihn einstellen zu können
   XMC_CCU4_StopPrescaler(ccu4_0_HW);
   uint32_t ticksPeriod  = 0;
@@ -29,7 +29,7 @@ void setPeriodTime(double_t const period, const uint8_t* const dutyCycle) {
       // timer ticks period = periodeValue in s / time between timer ticks
       ticksPeriod  = (uint32_t)round(period / timerTickTimes[i]) - 1;
       // timer ticks compare output on for duty cycle in %
-      ticksCompare = (uint32_t)round(ticksPeriod * ((100 - *dutyCycle) / 100.0));
+      ticksCompare = (uint32_t)round(ticksPeriod * ((100 - dutyCycle) / 100.0));
       break;
     }
   }
@@ -43,7 +43,7 @@ void setPeriodTime(double_t const period, const uint8_t* const dutyCycle) {
   XMC_CCU4_SLICE_StartTimer(timerFreq_HW);
 }
 
-void setFrequency(const double_t frequency, const uint8_t* const dutyCycle, const mode_t* const mode) {
+void setFrequency(const double_t frequency, const uint8_t dutyCycle, const mode_t* const mode) {
   // Nur Frequenzen zwischen 100 mHz und 10 kHz
   if (frequency >= 0.1 && frequency <= 10000) {
     // Frequenz verdoppeln weil hier vier statt zwei Zustandswechsel stattfinden müssen
@@ -54,12 +54,12 @@ void setFrequency(const double_t frequency, const uint8_t* const dutyCycle, cons
   }
 }
 
-void setPeriodCount(const uint8_t* const periodCountValue, const mode_t* const mode) {
+void setPeriodCount(const uint8_t periodCountValue, const mode_t* const mode) {
   XMC_CCU4_SLICE_StopClearTimer(timerPeriodCount_HW);
   if (*mode == MODE_RL || *mode == MODE_LR) {
-    XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (2 * (*periodCountValue)));
+    XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (2 * periodCountValue));
   } else if (*mode == MODE_BP) {
-    XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (4 * (*periodCountValue)));
+    XMC_CCU4_SLICE_SetTimerPeriodMatch(timerPeriodCount_HW, (4 * periodCountValue));
   }
   XMC_CCU4_EnableShadowTransfer(ccu4_0_HW, XMC_CCU4_SHADOW_TRANSFER_SLICE_2);
   XMC_CCU4_SLICE_StartTimer(timerPeriodCount_HW);

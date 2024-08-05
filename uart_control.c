@@ -14,8 +14,8 @@ void stopStimulation(const mode_t *const mode, uint16_t *const state) {
   *state     = 0;
 }
 
-void modeSwitch(const uint8_t *const modeControlCode, mode_t *const mode, uint16_t *const state) {
-  switch (*modeControlCode) {
+void modeSwitch(const uint8_t modeControlCode, mode_t *const mode, const uint16_t* const state) {
+  switch ( modeControlCode) {
   case 0xFF:
     *mode = MODE_LR;
     break;
@@ -35,10 +35,10 @@ void modeSwitch(const uint8_t *const modeControlCode, mode_t *const mode, uint16
   PORT0->OMR = lookupMatrix[*mode][*state];
 }
 
-void frequencySwitch(const uint16_t *const frequencyControlCode, const uint8_t *const dutyCycle,
-                     const mode_t *const mode) {
+void frequencySwitch(const uint16_t frequencyControlCode, const uint8_t dutyCycle,
+                     const mode_t* const mode) {
   // Kodierte werte für Frequenzen mit Dezimalstelle
-  switch (*frequencyControlCode) {
+  switch (frequencyControlCode) {
   case 0xFFFF:
     setFrequency(0.1, dutyCycle, mode);
     break;
@@ -49,30 +49,30 @@ void frequencySwitch(const uint16_t *const frequencyControlCode, const uint8_t *
     setFrequency(0.8, dutyCycle, mode);
     break;
   default:
-    setFrequency(*frequencyControlCode, dutyCycle, mode);
+    setFrequency(frequencyControlCode, dutyCycle, mode);
     break;
   }
 }
 
-void uartCommandEvaluation(const uint16_t *const frequency, const uint8_t *const dutyCycle,
-                           const uint8_t *const periodCount, mode_t *const mode, uint16_t *const state) {
+void uartCommandEvaluation(const uint16_t frequency, const uint8_t dutyCycle,
+                           const uint8_t periodCount, mode_t *const mode, uint16_t *const state) {
   // Wenn die Frequenz 0 empfangen wird wird die Anregung sofort gestoppt
   // Ansonsten wird geprüft ob über den Tastgrad eine kodierte Anweisung (FF, FE, FD oder FC) zum Moduswechsel
   // übertragen wird Wenn ein Modus wechsel durchgeführt wird zunächst die Anregung gestoppt und dann der Startzustand
   // des Modus auf den Port ausgegeben
   //! Nach einem Moduswechsel sollte mindestens 30 ms gewartet werden, damit die Tracos sich initialisieren können
   // Alles Null == Master Reset
-  if (*frequency == 0 && *dutyCycle == 0 && *periodCount == 0) {
+  if (frequency == 0 && dutyCycle == 0 && periodCount == 0) {
     XMC_SCU_RESET_AssertMasterReset();
-  } else if (*frequency == 0) {
+  } else if (frequency == 0) {
     stopStimulation(mode, state);
-  } else if (*dutyCycle <= 0xFF && *dutyCycle >= 0xFC) {
+  } else if (dutyCycle <= 0xFF && dutyCycle >= 0xFC) {
     // Modus Wechsel
     stopStimulation(mode, state);
     modeSwitch(dutyCycle, mode, state);
-  } else if (*dutyCycle >= 0 && *dutyCycle <= 100) {
+  } else if (dutyCycle >= 0 && dutyCycle <= 100) {
     // Perioden Zähler setzen (0 = Keine begrezung der Periodenzahl)
-    if (*periodCount != 0) {
+    if (periodCount != 0) {
       setPeriodCount(periodCount, mode);
     }
 

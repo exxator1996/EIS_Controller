@@ -112,7 +112,7 @@ void uart_RECEIVE_BUFFER_STANDARD_EVENT_HANDLER() {
   uint8_t periodCount = receivedData[3];
 
   // Auswertung der Empgangen Daten
-  uartCommandEvaluation(&newFrequency, &dutyCycle, &periodCount, &mode, &state);
+  uartCommandEvaluation(newFrequency, dutyCycle, periodCount, &mode, &state);
 }
 
 
