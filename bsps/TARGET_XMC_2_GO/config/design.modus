@@ -170,7 +170,7 @@
                         <Param id="override_trigger_function" value="XMC_CCU4_SLICE_EVENT_NONE"/>
                         <Param id="override_value_function" value="XMC_CCU4_SLICE_EVENT_NONE"/>
                         <Param id="period_match_event_sr" value="2"/>
-                        <Param id="prescaler_initial_value" value="32"/>
+                        <Param id="prescaler_initial_value" value="1"/>
                         <Param id="prescaler_mode" value="XMC_CCU4_SLICE_PRESCALER_MODE_NORMAL"/>
                         <Param id="shadow_transfer_mode" value="XMC_CCU4_SLICE_SHADOW_TRANSFER_MODE_IN_PERIOD_MATCH_AND_ONE_MATCH"/>
                         <Param id="single_shot_mode" value="true"/>
