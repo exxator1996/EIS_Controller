@@ -18,7 +18,7 @@
         //mtb//      macOS  : $HOME/Library/Application Support/Code/User/settings.json
         //mtb//      Linux  : $HOME/.config/Code/User/settings.json
         //mtb//
-        "modustoolbox.toolsPath": "C:/Users/niklas/ModusToolbox/tools_3.2",
+        "modustoolbox.toolsPath": "C:/Users/niklas/ModusToolbox/tools_3.3",
         "cortex-debug.armToolchainPath": "${config:modustoolbox.toolsPath}/gcc/bin",
         "cortex-debug.openocdPath": "${config:modustoolbox.toolsPath}/openocd/bin/openocd.exe",
         "cortex-debug.JLinkGDBServerPath.windows": "C:/Program Files/SEGGER/JLink/JLinkGDBServerCL.exe",
@@ -29,7 +29,19 @@
             "--log=verbose",
             "--background-index",
             "--compile-commands-dir=${workspaceFolder}/build"
-        ]
+        ],
+        "c-cpp-flylint.language": "c",
+        "c-cpp-flylint.cppcheck.executable": "cppcheck",
+        "c-cpp-flylint.enable": true,
+        "c-cpp-flylint.clang.standard": [
+
+        ],
+        "c-cpp-flylint.flexelint.enable": false,
+        "c-cpp-flylint.lizard.enable": false,
+        "c-cpp-flylint.flawfinder.enable": false,
+        "c-cpp-flylint.clang.pedantic": true,
+        "c-cpp-flylint.clang.pedanticErrors": true,
+        "c-cpp-flylint.cppcheck.verbose": true
     },
     "extensions": {
         "recommendations": [ "marus25.cortex-debug", "ms-vscode.cpptools", "dan-c-underwood.arm" ]

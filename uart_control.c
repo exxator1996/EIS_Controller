@@ -14,25 +14,25 @@ void stopStimulation(const mode_t *const mode, uint16_t *const state) {
   *state     = 0;
 }
 
-void modeSwitch(const uint8_t modeControlCode, mode_t *const mode, const uint16_t* const state) {
+void modeSwitch(const dutyCycleModeCode_t modeControlCode, mode_t *const mode, const uint16_t* const state) {
   switch ( modeControlCode) {
-  case 0xFF:
+  case DUTY_CYCLE_MODE_LR:
     *mode = MODE_LR;
     break;
-  case 0xFE:
+  case DUTY_CYCLE_MODE_RL:
     *mode = MODE_RL;
     break;
-  case 0xFD:
+  case DUTY_CYCLE_MODE_BP:
     *mode = MODE_BP;
     break;
-  case 0xFC:
+  case DUTY_CYCLE_MODE_IDLE:
   // Wenn keine gültige eingabe automatisch in sicheren IDLE Zustand
   default:
     *mode = MODE_IDLE;
     break;
   }
   // Ausgang in abhängikeit von neuem Zustand setzen
-  PORT0->OMR = lookupMatrix[*mode][*state];
+  PORT0->OMR = lookupMatrix[*mode][*state] ;
 }
 
 void frequencySwitch(const uint16_t frequencyControlCode, const uint8_t dutyCycle,
@@ -66,11 +66,11 @@ void uartCommandEvaluation(const uint16_t frequency, const uint8_t dutyCycle,
     XMC_SCU_RESET_AssertMasterReset();
   } else if (frequency == 0) {
     stopStimulation(mode, state);
-  } else if (dutyCycle <= 0xFF && dutyCycle >= 0xFC) {
+  } else if (dutyCycle <= DUTY_CYCLE_MODE_LR && dutyCycle >= DUTY_CYCLE_MODE_IDLE) {
     // Modus Wechsel
     stopStimulation(mode, state);
     modeSwitch(dutyCycle, mode, state);
-  } else if (dutyCycle >= 0 && dutyCycle <= 100) {
+  } else if (dutyCycle >= DUTY_CYCLE_LOWER_BOUNDARY && dutyCycle <= DUTY_CYCLE_UPPER_BOUNDARY) {
     // Perioden Zähler setzen (0 = Keine begrezung der Periodenzahl)
     if (periodCount != 0) {
       setPeriodCount(periodCount, mode);
